@@ -118,7 +118,7 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 	if *a.Type != *b.Type {
 		return nil, fmt.Errorf("Cannot merge metric '%s': type %s != %s",
-			a.Name, a.Type.String(), b.Type.String())
+			*a.Name, a.Type.String(), b.Type.String())
 	}
 
 	output := &dto.MetricFamily{
