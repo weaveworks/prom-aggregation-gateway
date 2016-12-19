@@ -26,17 +26,17 @@ images:
 	$(info $(IMAGE_NAMES))
 
 # List of exes please
-AGGATE_EXE := cmd/aggate/aggate
-EXES = $(AGGATE_EXE)
+PROM_AGG_GATEWAY_EXE := cmd/prom-aggregation-gateway/prom-aggregation-gateway
+EXES = $(PROM_AGG_GATEWAY_EXE)
 
 all: $(UPTODATE_FILES)
 
 # And what goes into each exe
-$(AGGATE_EXE): $(shell find cmd -name '*.go')
+$(PROM_AGG_GATEWAY_EXE): $(shell find cmd -name '*.go')
 
 # And now what goes into each image
 aggate-build/$(UPTODATE): aggate-build/*
-cmd/aggate/$(UPTODATE): $(AGGATE_EXE)
+cmd/prom-aggregation-gateway/$(UPTODATE): $(PROM_AGG_GATEWAY_EXE)
 
 # All the boiler plate for building golang follows:
 SUDO := $(shell docker info >/dev/null 2>&1 || echo "sudo -E")
@@ -58,7 +58,7 @@ $(EXES) lint test: aggate-build/$(UPTODATE)
 	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) -ti \
 		-v $(shell pwd)/.pkg:/go/pkg \
-		-v $(shell pwd):/go/src/github.com/weaveworks/aggate \
+		-v $(shell pwd):/go/src/github.com/weaveworks/prom-aggregation-gateway \
 		-e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR \
 		$(IMAGE_PREFIX)/aggate-build $@
 
