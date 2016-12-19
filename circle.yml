@@ -1,0 +1,19 @@
+machine:
+  services:
+    - docker
+  environment:
+    PATH: /usr/local/go/bin:$HOME/bin:$PATH
+
+dependencies:
+  cache_directories:
+    - "~/docker"
+  post:
+    - |
+        cd aggate-build &&
+        ../tools/rebuild-image weaveworks/aggate-build . build.sh Dockerfile &&
+        touch .uptodate
+
+test:
+  override:
+    - make RM= lint
+    - make RM=
