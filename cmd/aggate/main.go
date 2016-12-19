@@ -201,8 +201,14 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 
 	a.familiesLock.RLock()
 	defer a.familiesLock.RUnlock()
-	for _, family := range a.families {
-		if err := enc.Encode(family); err != nil {
+	metricNames := []string{}
+	for name := range a.families {
+		metricNames = append(metricNames, name)
+	}
+	sort.Sort(sort.StringSlice(metricNames))
+
+	for _, name := range metricNames {
+		if err := enc.Encode(a.families[name]); err != nil {
 			http.Error(w, "An error has occurred during metrics encoding:\n\n"+err.Error(), http.StatusInternalServerError)
 			return
 		}

@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 const (
@@ -51,16 +52,15 @@ histogram_bucket{le="8"} 5
 histogram_bucket{le="9"} 5
 histogram_bucket{le="10"} 5
 histogram_bucket{le="+Inf"} 5
-histogram_sum{} 4.5
-histogram_count{} 1
+histogram_sum 4.5
+histogram_count 1
 `
-	expected = `
+	want = `# HELP counter A counter
+# TYPE counter counter
+counter 60
 # HELP gauge A gauge
 # TYPE gauge gauge
 gauge 99
-# HELP counter A counter
-# TYPE counter counter
-counter 60
 # HELP histogram A histogram
 # TYPE histogram histogram
 histogram_bucket{le="1"} 0
@@ -74,8 +74,8 @@ histogram_bucket{le="8"} 9
 histogram_bucket{le="9"} 9
 histogram_bucket{le="10"} 9
 histogram_bucket{le="+Inf"} 9
-histogram_sum{} 7
-histogram_count{} 2
+histogram_sum 7
+histogram_count 2
 `
 )
 
@@ -93,8 +93,14 @@ func TestAggate(t *testing.T) {
 	w := httptest.NewRecorder()
 	a.handler(w, r)
 
-	if w.Body.String() != expected {
-		fmt.Println(w.Body.String())
-		t.Fatal("Don't match")
+	if have := w.Body.String(); have != want {
+		text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+			A:        difflib.SplitLines(want),
+			B:        difflib.SplitLines(have),
+			FromFile: "want",
+			ToFile:   "have",
+			Context:  3,
+		})
+		t.Fatal(text)
 	}
 }
