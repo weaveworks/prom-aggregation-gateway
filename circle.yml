@@ -17,3 +17,17 @@ test:
   override:
     - make RM= lint
     - make RM=
+
+deployment:
+  push:
+    branch: master
+    commands:
+      - docker login -e "$DOCKER_REGISTRY_EMAIL" -u "$DOCKER_REGISTRY_USER" -p "$DOCKER_REGISTRY_PASSWORD"
+      - docker tag weaveworks/prom-aggregation-gateway:$(./tools/image-tag) weaveworks/prom-aggregation-gateway:latest
+      - docker push weaveworks/prom-aggregation-gateway:$(./tools/image-tag)
+      - docker push weaveworks/prom-aggregation-gateway:latest
+      - docker login -e "." -u "$QUAY_USER" -p "$QUAY_PASSWORD" quay.io
+      - docker tag weaveworks/prom-aggregation-gateway:$(./tools/image-tag) quay.io/weaveworks/prom-aggregation-gateway:latest
+      - docker tag weaveworks/prom-aggregation-gateway:$(./tools/image-tag) quay.io/weaveworks/prom-aggregation-gateway:$(./tools/image-tag)
+      - docker push quay.io/weaveworks/prom-aggregation-gateway:$(./tools/image-tag)
+      - docker push quay.io/weaveworks/prom-aggregation-gateway:latest
