@@ -77,30 +77,51 @@ histogram_bucket{le="+Inf"} 9
 histogram_sum 7
 histogram_count 2
 `
+
+	multilabel1 = `# HELP counter A counter
+# TYPE counter counter
+counter{a="a",b="b"} 1
+`
+	multilable2 = `# HELP counter A counter
+# TYPE counter counter
+counter{a="a",b="b"} 2
+`
+	multilabelResult = `# HELP counter A counter
+# TYPE counter counter
+counter{a="a",b="b"} 3
+`
 )
 
 func TestAggate(t *testing.T) {
-	a := newAggate()
+	for _, c := range []struct {
+		a, b string
+		want string
+	}{
+		{in1, in2, want},
+		{multilabel1, multilable2, multilabelResult},
+	} {
+		a := newAggate()
 
-	if err := a.parseAndMerge(strings.NewReader(in1)); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.parseAndMerge(strings.NewReader(in2)); err != nil {
-		t.Fatal(err)
-	}
+		if err := a.parseAndMerge(strings.NewReader(c.a)); err != nil {
+			t.Fatal(err)
+		}
+		if err := a.parseAndMerge(strings.NewReader(c.b)); err != nil {
+			t.Fatal(err)
+		}
 
-	r := httptest.NewRequest("GET", "http://example.com/foo", nil)
-	w := httptest.NewRecorder()
-	a.handler(w, r)
+		r := httptest.NewRequest("GET", "http://example.com/foo", nil)
+		w := httptest.NewRecorder()
+		a.handler(w, r)
 
-	if have := w.Body.String(); have != want {
-		text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-			A:        difflib.SplitLines(want),
-			B:        difflib.SplitLines(have),
-			FromFile: "want",
-			ToFile:   "have",
-			Context:  3,
-		})
-		t.Fatal(text)
+		if have := w.Body.String(); have != c.want {
+			text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+				A:        difflib.SplitLines(c.want),
+				B:        difflib.SplitLines(have),
+				FromFile: "want",
+				ToFile:   "have",
+				Context:  3,
+			})
+			t.Fatal(text)
+		}
 	}
 }

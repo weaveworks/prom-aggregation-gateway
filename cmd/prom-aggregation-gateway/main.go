@@ -22,6 +22,8 @@ func lablesLessThan(a, b []*dto.LabelPair) bool {
 		if *a[i].Value != *b[j].Value {
 			return *a[i].Value < *b[j].Value
 		}
+		i++
+		j++
 	}
 	return len(a) < len(b)
 }
