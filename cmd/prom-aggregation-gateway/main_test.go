@@ -82,13 +82,27 @@ histogram_count 2
 # TYPE counter counter
 counter{a="a",b="b"} 1
 `
-	multilable2 = `# HELP counter A counter
+	multilabel2 = `# HELP counter A counter
 # TYPE counter counter
 counter{a="a",b="b"} 2
 `
 	multilabelResult = `# HELP counter A counter
 # TYPE counter counter
 counter{a="a",b="b"} 3
+`
+	labelFields1 = `# HELP ui_page_render_errors A counter
+# TYPE ui_page_render_errors counter
+ui_page_render_errors{path="/org/:orgId"} 1
+ui_page_render_errors{path="/prom/:orgId"} 1
+`
+	labelFields2 = `# HELP ui_page_render_errors A counter
+# TYPE ui_page_render_errors counter
+ui_page_render_errors{path="/prom/:orgId"} 1
+`
+	labelFieldResult = `# HELP ui_page_render_errors A counter
+# TYPE ui_page_render_errors counter
+ui_page_render_errors{path="/org/:orgId"} 1
+ui_page_render_errors{path="/prom/:orgId"} 2
 `
 )
 
@@ -98,7 +112,8 @@ func TestAggate(t *testing.T) {
 		want string
 	}{
 		{in1, in2, want},
-		{multilabel1, multilable2, multilabelResult},
+		{multilabel1, multilabel2, multilabelResult},
+		{labelFields1, labelFields2, labelFieldResult},
 	} {
 		a := newAggate()
 
