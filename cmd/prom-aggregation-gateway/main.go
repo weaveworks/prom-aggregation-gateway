@@ -134,7 +134,7 @@ func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 		if lablesLessThan(a.Metric[i].Label, b.Metric[j].Label) {
 			output.Metric = append(output.Metric, a.Metric[i])
 			i++
-		} else if lablesLessThan(b.Metric[i].Label, a.Metric[j].Label) {
+		} else if lablesLessThan(b.Metric[j].Label, a.Metric[i].Label) {
 			output.Metric = append(output.Metric, b.Metric[j])
 			j++
 		} else {

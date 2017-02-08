@@ -3,7 +3,7 @@
 
 # Boiler plate for bulding Docker containers.
 # All this must go at top of file I'm afraid.
-IMAGE_PREFIX := weaveworks
+IMAGE_PREFIX := quay.io/weaveworks
 IMAGE_TAG := $(shell ./tools/image-tag)
 UPTODATE := .uptodate
 
@@ -80,5 +80,3 @@ clean:
 	$(SUDO) docker rmi $(IMAGE_NAMES) >/dev/null 2>&1 || true
 	rm -rf $(UPTODATE_FILES) $(EXES)
 	go clean ./...
-
-
