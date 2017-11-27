@@ -221,10 +221,13 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	listen := flag.String("listen", ":80", "Address and port to listen on.")
+	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
+	flag.Parse()
 
 	a := newAggate()
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/api/ui/metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", *cors)
 		if err := a.parseAndMerge(r.Body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
