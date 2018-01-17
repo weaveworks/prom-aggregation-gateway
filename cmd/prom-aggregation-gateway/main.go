@@ -11,6 +11,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
 
 func lablesLessThan(a, b []*dto.LabelPair) bool {
@@ -166,6 +167,28 @@ func newAggate() *aggate {
 	}
 }
 
+func validateFamily(f *dto.MetricFamily) error {
+	// Map of fingerprints we've seen before in this family
+	fingerprints := make(map[model.Fingerprint]struct{}, len(f.Metric))
+	for _, m := range f.Metric {
+		// Turn protobuf LabelSet into Prometheus model LabelSet
+		lset := make(model.LabelSet, len(m.Label)+1)
+		for _, p := range m.Label {
+			lset[model.LabelName(p.GetName())] = model.LabelValue(p.GetValue())
+		}
+		lset[model.MetricNameLabel] = model.LabelValue(f.GetName())
+		if err := lset.Validate(); err != nil {
+			return err
+		}
+		fingerprint := lset.Fingerprint()
+		if _, found := fingerprints[fingerprint]; found {
+			return fmt.Errorf("Duplicate labels: %v", lset)
+		}
+		fingerprints[fingerprint] = struct{}{}
+	}
+	return nil
+}
+
 func (a *aggate) parseAndMerge(r io.Reader) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
@@ -176,6 +199,9 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
 	for name, family := range inFamilies {
+		if err := validateFamily(family); err != nil {
+			return err
+		}
 		existingFamily, ok := a.families[name]
 		if !ok {
 			a.families[name] = family
@@ -229,6 +255,7 @@ func main() {
 	http.HandleFunc("/api/ui/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
 		if err := a.parseAndMerge(r.Body); err != nil {
+			log.Println(err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
