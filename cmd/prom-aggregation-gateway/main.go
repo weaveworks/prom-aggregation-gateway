@@ -202,14 +202,15 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 		if err := validateFamily(family); err != nil {
 			return err
 		}
+
+		// family must be sorted for the merge
+		sort.Sort(byLabel(family.Metric))
+
 		existingFamily, ok := a.families[name]
 		if !ok {
 			a.families[name] = family
 			continue
 		}
-
-		// family must be sorted for the merge
-		sort.Sort(byLabel(family.Metric))
 
 		merged, err := mergeFamily(existingFamily, family)
 		if err != nil {
