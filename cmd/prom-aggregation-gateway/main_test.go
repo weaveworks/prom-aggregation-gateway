@@ -105,6 +105,19 @@ ui_page_render_errors{path="/prom/:orgId"} 1
 ui_page_render_errors{path="/org/:orgId"} 1
 ui_page_render_errors{path="/prom/:orgId"} 2
 `
+	gaugeInput = `
+# HELP ui_external_lib_loaded A gauge with entries in un-sorted order
+# TYPE ui_external_lib_loaded gauge
+ui_external_lib_loaded{name="ga",loaded="true"} 1
+ui_external_lib_loaded{name="Intercom",loaded="true"} 1
+ui_external_lib_loaded{name="mixpanel",loaded="true"} 1
+`
+	gaugeOutput = `# HELP ui_external_lib_loaded A gauge with entries in un-sorted order
+# TYPE ui_external_lib_loaded gauge
+ui_external_lib_loaded{name="Intercom",loaded="true"} 2
+ui_external_lib_loaded{name="ga",loaded="true"} 2
+ui_external_lib_loaded{name="mixpanel",loaded="true"} 2
+`
 	duplicateLabels = `
 # HELP ui_external_lib_loaded Test with duplicate values
 # TYPE ui_external_lib_loaded gauge
@@ -121,6 +134,7 @@ func TestAggate(t *testing.T) {
 		err1 error
 		err2 error
 	}{
+		{gaugeInput, gaugeInput, gaugeOutput, nil, nil},
 		{in1, in2, want, nil, nil},
 		{multilabel1, multilabel2, multilabelResult, nil, nil},
 		{labelFields1, labelFields2, labelFieldResult, nil, nil},
