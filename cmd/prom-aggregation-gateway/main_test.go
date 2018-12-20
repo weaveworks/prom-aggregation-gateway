@@ -125,6 +125,19 @@ ui_external_lib_loaded{name="Munchkin",loaded="true"} 15171
 ui_external_lib_loaded{name="Munchkin",loaded="true"} 1
 `
 	duplicateError = `Duplicate labels: {__name__="ui_external_lib_loaded", loaded="true", name="Munchkin"}`
+
+	reorderedLabels1 = `# HELP counter A counter
+# TYPE counter counter
+counter{a="a",b="b"} 1
+`
+	reorderedLabels2 = `# HELP counter A counter
+# TYPE counter counter
+counter{b="b",a="a"} 2
+`
+	reorderedLabelsResult = `# HELP counter A counter
+# TYPE counter counter
+counter{a="a",b="b"} 3
+`
 )
 
 func TestAggate(t *testing.T) {
@@ -139,6 +152,7 @@ func TestAggate(t *testing.T) {
 		{multilabel1, multilabel2, multilabelResult, nil, nil},
 		{labelFields1, labelFields2, labelFieldResult, nil, nil},
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
+		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
 	} {
 		a := newAggate()
 
