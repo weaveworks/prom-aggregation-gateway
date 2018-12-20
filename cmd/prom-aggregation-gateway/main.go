@@ -35,6 +35,13 @@ func (a byLabel) Len() int           { return len(a) }
 func (a byLabel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byLabel) Less(i, j int) bool { return lablesLessThan(a[i].Label, a[j].Label) }
 
+// Sort a slice of LabelPairs by name
+type byName []*dto.LabelPair
+
+func (a byName) Len() int           { return len(a) }
+func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byName) Less(i, j int) bool { return a[i].GetName() < a[j].GetName() }
+
 func uint64ptr(a uint64) *uint64 {
 	return &a
 }
@@ -199,6 +206,11 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
 	for name, family := range inFamilies {
+		// Sort labels in case source sends them inconsistently
+		for _, m := range family.Metric {
+			sort.Sort(byName(m.Label))
+		}
+
 		if err := validateFamily(family); err != nil {
 			return err
 		}
