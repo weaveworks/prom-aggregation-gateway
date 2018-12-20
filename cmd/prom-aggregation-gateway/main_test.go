@@ -114,9 +114,9 @@ ui_external_lib_loaded{name="mixpanel",loaded="true"} 1
 `
 	gaugeOutput = `# HELP ui_external_lib_loaded A gauge with entries in un-sorted order
 # TYPE ui_external_lib_loaded gauge
-ui_external_lib_loaded{name="Intercom",loaded="true"} 2
-ui_external_lib_loaded{name="ga",loaded="true"} 2
-ui_external_lib_loaded{name="mixpanel",loaded="true"} 2
+ui_external_lib_loaded{loaded="true",name="Intercom"} 2
+ui_external_lib_loaded{loaded="true",name="ga"} 2
+ui_external_lib_loaded{loaded="true",name="mixpanel"} 2
 `
 	duplicateLabels = `
 # HELP ui_external_lib_loaded Test with duplicate values
