@@ -3,12 +3,12 @@
 
 # Boiler plate for bulding Docker containers.
 # All this must go at top of file I'm afraid.
-IMAGE_PREFIX := quay.io/weaveworks
+IMAGE_PREFIX := docker.io/weaveworks
 IMAGE_TAG := $(shell ./tools/image-tag)
 UPTODATE := .uptodate
 
 # Building Docker images is now automated. The convention is every directory
-# with a Dockerfile in it builds an image calls quay.io/weaveworks/<dirname>.
+# with a Dockerfile in it builds an image calls docker.io/weaveworks/<dirname>.
 # Dependencies (i.e. things that go in the image) still need to be explicitly
 # declared.
 %/$(UPTODATE): %/Dockerfile
@@ -64,14 +64,14 @@ $(EXES) lint test: aggate-build/$(UPTODATE)
 
 else
 
-$(EXES): aggate-build/$(UPTODATE)
+$(EXES):
 	go build $(GO_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
-lint: aggate-build/$(UPTODATE)
+lint:
 	./tools/lint .
 
-test: aggate-build/$(UPTODATE)
+test:
 	./tools/test -no-go-get
 
 endif
