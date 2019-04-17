@@ -1,0 +1,21 @@
+version: 2
+jobs:
+  build:
+    working_directory: /go/src/github.com/weaveworks/prom-aggregation-gateway
+    docker:
+      - image: weaveworks/build-golang:1.11.1-stretch
+    steps:
+      - checkout
+      - setup_remote_docker
+
+      - run: make lint BUILD_IN_CONTAINER=false
+      - run: make cmd/prom-aggregation-gateway/.uptodate BUILD_IN_CONTAINER=false
+
+      - deploy:
+          name: Push master image
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              docker login -u "$DOCKER_REGISTRY_USER" -p "$DOCKER_REGISTRY_PASSWORD"
+              docker push weaveworks/prom-aggregation-gateway:$(./tools/image-tag)
+              docker push weaveworks/prom-aggregation-gateway:latest
+            fi
