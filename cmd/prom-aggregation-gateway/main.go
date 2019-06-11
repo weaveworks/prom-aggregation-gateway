@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"sort"
 	"sync"
+	"syscall"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -258,14 +264,39 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 	// TODO reset gauges
 }
 
+var (
+	// Version is the build git hash
+	Version string
+	// BuildTime is the time the build was built
+	BuildTime string
+
+	pushPort    = flag.String("push-port", ":80", "port to push metrics")
+	pushPath    = flag.String("push-path", "/", "path to push metrics")
+	metricsPort = flag.String("metrics-port", ":81", "port to fetch metrics")
+	metricsPath = flag.String("metrics-path", "/", "path to fetch metrics")
+	cors        = flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
+)
+
 func main() {
-	listen := flag.String("listen", ":80", "Address and port to listen on.")
-	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
 	flag.Parse()
 
 	a := newAggate()
-	http.HandleFunc("/metrics", a.handler)
-	http.HandleFunc("/api/ui/metrics", func(w http.ResponseWriter, r *http.Request) {
+
+	srvMux := http.NewServeMux()
+	srvMux.HandleFunc(*pushPath, a.handler)
+	srv := http.Server{Addr: *pushPort, Handler: srvMux}
+	go func() {
+		log.WithFields(log.Fields{"port": *pushPort, "path": *pushPath}).Infof("started push endpoint")
+		err := srv.ListenAndServe()
+		if err != nil {
+			log.WithError(err).
+				WithField("server_port", srv.Addr).
+				Fatal("failed to start push server")
+		}
+	}()
+
+	metricsSrvMux := http.NewServeMux()
+	metricsSrvMux.HandleFunc(*metricsPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
 		if err := a.parseAndMerge(r.Body); err != nil {
 			log.Println(err)
@@ -273,5 +304,36 @@ func main() {
 			return
 		}
 	})
-	log.Fatal(http.ListenAndServe(*listen, nil))
+	metricsSrv := http.Server{Addr: *metricsPort, Handler: metricsSrvMux}
+	go func() {
+		log.WithFields(log.Fields{"port": *metricsPort, "path": *metricsPath}).Infof("started metrics endpoint")
+		err := metricsSrv.ListenAndServe()
+		if err != nil {
+			log.WithError(err).
+				WithField("server_port", metricsSrv.Addr).
+				Fatal("failed to start metrics server")
+		}
+	}()
+
+	log.Infof("Prometheus Aggreagation Push server started")
+
+	// Wait for an interrupt
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)    // interrupt signal sent from terminal
+	signal.Notify(sigint, syscall.SIGTERM) // sigterm signal sent from kubernetes
+	<-sigint
+
+	log.WithFields(log.Fields{"version": Version, "build_time": BuildTime}).Infof("Shutting down Saturn server")
+
+	// Attempt a graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := srv.Shutdown(ctx)
+	if err != nil {
+		log.WithError(err).Error("failed to shutdown push server")
+	}
+	err = metricsSrv.Shutdown(ctx)
+	if err != nil {
+		log.WithError(err).Error("failed to shutdown metrics server")
+	}
 }
