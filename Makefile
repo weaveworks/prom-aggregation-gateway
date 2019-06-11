@@ -1,82 +1,70 @@
-.PHONY: all test clean images
-.DEFAULT_GOAL := all
+SHELL := /bin/bash -eu
 
-# Boiler plate for bulding Docker containers.
-# All this must go at top of file I'm afraid.
-IMAGE_PREFIX := docker.io/weaveworks
-IMAGE_TAG := $(shell ./tools/image-tag)
-UPTODATE := .uptodate
+AWS_REGION            := eu-central-1
+BUILD_DIR             := bin
+PACKAGES              := $(shell go list ./...)
+LINT_TARGETS          := $(shell go list -f '{{.Dir}}' ./... | sed -e"s|${CURDIR}/\(.*\)\$$|\1/...|g" | grep -v ^node_modules/ )
+DEPENDENCIES          := $(shell find . -type f -name '*.go')
+BINARIES              := $(shell find ./cmd -name 'main.go' | grep -v -e node_modules -e vendor |awk -F/ '{print "bin/" $$3}')
+SERVICE               := prometheus-aggregation-pushgateway
+GITHUB_OWNER          := moia-dev
+GITHUB_REPOSITORY     := $(SERVICE)
+REPOSITORY            := $(GITHUB_OWNER)/$(GITHUB_REPOSITORY)
+DOCKER_REGISTRY       := 614608043005.dkr.ecr.eu-central-1.amazonaws.com
+SYSTEM                := $(shell uname -s | tr A-Z a-z)_$(shell uname -m | sed "s/x86_64/amd64/")
+BUILD_TIME            := $(shell date +%FT%T%z)
+GOLANGCI_LINT_VERSION := 1.15.0
+GIT_HASH              := $(shell git describe --always --tags --dirty)
+VERSION               := $(shell echo $$(date "+%Y%m%d")-$$(git rev-parse --short HEAD) )
+SLACK_ICON            := :telescope:
 
-# Building Docker images is now automated. The convention is every directory
-# with a Dockerfile in it builds an image calls docker.io/weaveworks/<dirname>.
-# Dependencies (i.e. things that go in the image) still need to be explicitly
-# declared.
-%/$(UPTODATE): %/Dockerfile
-	$(SUDO) docker build -t $(IMAGE_PREFIX)/$(shell basename $(@D)) $(@D)/
-	$(SUDO) docker tag $(IMAGE_PREFIX)/$(shell basename $(@D)) $(IMAGE_PREFIX)/$(shell basename $(@D)):$(IMAGE_TAG)
-	touch $@
+all: lint build test
 
-# Get a list of directories containing Dockerfiles
-DOCKERFILES=$(shell find * -type f -name Dockerfile ! -path "tools/*" ! -path "vendor/*")
-UPTODATE_FILES=$(patsubst %/Dockerfile,%/$(UPTODATE),$(DOCKERFILES))
-DOCKER_IMAGE_DIRS=$(patsubst %/Dockerfile,%,$(DOCKERFILES))
-IMAGE_NAMES=$(foreach dir,$(DOCKER_IMAGE_DIRS),$(patsubst %,$(IMAGE_PREFIX)/%,$(shell basename $(dir))))
+$(BUILD_DIR)/%: cmd/%/*.go $(DEPENDENCIES)
+	CGO_ENABLED=0 go build -ldflags="-s -w -X main.BuildTime=$(BUILD_TIME) -X main.Version=$(VERSION)" -o $@ ./cmd/$(notdir $@)
 
-images:
-	$(info $(IMAGE_NAMES))
+.PHONY: build
+build: $(BINARIES)
 
-# List of exes please
-PROM_AGG_GATEWAY_EXE := cmd/prom-aggregation-gateway/prom-aggregation-gateway
-EXES = $(PROM_AGG_GATEWAY_EXE)
+tools/golangci-lint:
+	mkdir -p tools/
+	curl -sSLf \
+		https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/golangci-lint-$(GOLANGCI_LINT_VERSION)-$(shell echo $(SYSTEM) | tr '_' '-').tar.gz \
+		| tar xzOf - golangci-lint-$(GOLANGCI_LINT_VERSION)-$(shell echo $(SYSTEM) | tr '_' '-')/golangci-lint > tools/golangci-lint && chmod +x tools/golangci-lint
 
-all: $(UPTODATE_FILES)
+.PHONY: codecov
+codecov: codecov-report codecov-publish
 
-# And what goes into each exe
-$(PROM_AGG_GATEWAY_EXE): $(shell find cmd -name '*.go')
+.PHONY: codecov-report
+codecov-report:
+	curl --data-binary @codecov.yml https://codecov.io/validate
+	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
-# And now what goes into each image
-aggate-build/$(UPTODATE): aggate-build/*
-cmd/prom-aggregation-gateway/$(UPTODATE): $(PROM_AGG_GATEWAY_EXE)
+.PHONY: codecov-publish
+codecov-publish: guard-CODECOV_TOKEN
+	bash <(curl -s https://codecov.io/bash) -t $(CODECOV_TOKEN)
 
-# All the boiler plate for building golang follows:
-SUDO := $(shell docker info >/dev/null 2>&1 || echo "sudo -E")
-BUILD_IN_CONTAINER := true
-RM := --rm
-GO_FLAGS := -ldflags "-extldflags \"-static\" -linkmode=external -s -w" -tags netgo -i
-NETGO_CHECK = @strings $@ | grep cgo_stub\\\.go >/dev/null || { \
-	rm $@; \
-	echo "\nYour go standard library was built without the 'netgo' build tag."; \
-	echo "To fix that, run"; \
-	echo "    sudo go clean -i net"; \
-	echo "    sudo go install -tags netgo std"; \
-	false; \
-}
+.PHONY: docker-build
+docker-build:
+	docker build -t $(DOCKER_REGISTRY)/$(SERVICE):$(VERSION) .
 
-ifeq ($(BUILD_IN_CONTAINER),true)
+.PHONY: push-image
+push-image: docker-build
+	$$(aws ecr get-login --no-include-email --region $(AWS_REGION))
+	docker push $(DOCKER_REGISTRY)/$(SERVICE):$(VERSION)
 
-$(EXES) lint test: aggate-build/$(UPTODATE)
-	@mkdir -p $(shell pwd)/.pkg
-	$(SUDO) docker run $(RM) -ti \
-		-v $(shell pwd)/.pkg:/go/pkg \
-		-v $(shell pwd):/go/src/github.com/weaveworks/prom-aggregation-gateway \
-		-e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR \
-		$(IMAGE_PREFIX)/aggate-build $@
+.PHONY: ecr
+ecr: deployment/cloudformation/ecr.yml
+	aws cloudformation deploy \
+		--no-fail-on-empty-changeset \
+		--template-file $< \
+		--stack-name $(SERVICE)-ecr \
+		--parameter-overrides RepositoryName=$(SERVICE) \
+		--region $(AWS_REGION)
 
-else
+.PHONY: guard-%
+guard-%:
+	$(if $(value ${*}),,$(error "Variable ${*} not set!"))
 
-$(EXES):
-	go build $(GO_FLAGS) -o $@ ./$(@D)
-	$(NETGO_CHECK)
-
-lint:
-	./tools/lint .
-
-test:
-	./tools/test -no-go-get
-
-endif
-
-clean:
-	$(SUDO) docker rmi $(IMAGE_NAMES) >/dev/null 2>&1 || true
-	rm -rf $(UPTODATE_FILES) $(EXES)
-	go clean ./...
+.PHONY: print-%
+print-%  : ; @echo $* = $($*)
