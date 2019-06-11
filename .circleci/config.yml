@@ -1,30 +1,35 @@
-version: 2
+version: 2.1
+
 jobs:
-  build:
-    working_directory: /go/src/github.com/weaveworks/prom-aggregation-gateway
+  test:
     docker:
-      - image: weaveworks/build-golang:1.11.1-stretch
+    - image: circleci/golang:1.12
+    working_directory: /go/src/github.com/moia-dev/dynamic-routing-saturn
     steps:
-      - checkout
-      - setup_remote_docker
+    - checkout
+    - run: make test
+    - run: make lint
+    - run: make codecov
 
-      - run:
-          name: Install Docker client
-          command: |
-            set -x
-            VER="17.03.0-ce"
-            curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
-            tar -xz -C /tmp -f /tmp/docker-$VER.tgz
-            mv /tmp/docker/* /usr/bin
+  push:
+    docker:
+    - image: circleci/python:3
+    steps:
+    - checkout
+    - setup_remote_docker
+    - run: sudo pip install awscli
+    - run: |
+        source <(echo "export $PRD_CI_AWS_CREDENTIALS")
+        make push-image
 
-      - run: make lint BUILD_IN_CONTAINER=false
-      - run: make cmd/prom-aggregation-gateway/.uptodate BUILD_IN_CONTAINER=false
-
-      - deploy:
-          name: Push master image
-          command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              docker login -u "$DOCKER_REGISTRY_USER" -p "$DOCKER_REGISTRY_PASSWORD"
-              docker push weaveworks/prom-aggregation-gateway:$(./tools/image-tag)
-              docker push weaveworks/prom-aggregation-gateway:latest
-            fi
+workflows:
+  version: 2
+  production-pipeline:
+    jobs:
+    - test:
+        filters:
+          branches:
+            only: master
+    - push:
+        requires:
+        - test
