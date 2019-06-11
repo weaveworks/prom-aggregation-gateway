@@ -1,0 +1,82 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECR repository for the prometheus-aggregation-pushgateway'
+Parameters:
+  RepositoryName:
+    Type: String
+    Description: Name of the ECR repository.
+Resources:
+  Repository:
+    Type: "AWS::ECR::Repository"
+    Properties:
+      RepositoryName: !Ref "RepositoryName"
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+              "rules": [
+                  {
+                      "rulePriority": 1,
+                      "description": "Keep at minimum 50 prd images",
+                      "selection": {
+                          "tagStatus": "tagged",
+                          "tagPrefixList": ["prd"],
+                          "countType": "imageCountMoreThan",
+                          "countNumber": 50
+                      },
+                      "action": {
+                          "type": "expire"
+                      }
+                  },
+                  {
+                      "rulePriority": 2,
+                      "description": "Keep at minimum 50 int images",
+                      "selection": {
+                          "tagStatus": "tagged",
+                          "tagPrefixList": ["int"],
+                          "countType": "imageCountMoreThan",
+                          "countNumber": 50
+                      },
+                      "action": {
+                          "type": "expire"
+                      }
+                  },
+                  {
+                      "rulePriority": 3,
+                      "description": "Keep at minimum 50 dev images",
+                      "selection": {
+                          "tagStatus": "tagged",
+                          "tagPrefixList": ["dev"],
+                          "countType": "imageCountMoreThan",
+                          "countNumber": 50
+                      },
+                      "action": {
+                          "type": "expire"
+                      }
+                  },
+                  {
+                      "rulePriority": 4,
+                      "description": "Keep only 200 images, expire all others (except those marked with dev, int, prd)",
+                      "selection": {
+                          "tagStatus": "any",
+                          "countType": "imageCountMoreThan",
+                          "countNumber": 200
+                      },
+                      "action": {
+                          "type": "expire"
+                      }
+                  }
+              ]
+          }
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+        - Sid: allowK8s
+          Effect: Allow
+          Principal:
+            AWS:
+            - "arn:aws:iam::079073564612:root"
+            - "arn:aws:iam::866717576829:root"
+          Action:
+          - "ecr:GetDownloadUrlForLayer"
+          - "ecr:BatchGetImage"
+          - "ecr:BatchCheckLayerAvailability"
