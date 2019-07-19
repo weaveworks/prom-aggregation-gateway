@@ -1,3 +1,3 @@
-FROM weaveworks/build-golang:master-7fab441
+FROM weaveworks/build-golang:1.12.1-stretch
 COPY build.sh /
 ENTRYPOINT ["/build.sh"]
