@@ -69,7 +69,7 @@ $(EXES):
 	$(NETGO_CHECK)
 
 lint:
-	./tools/lint .
+	./tools/lint ./cmd
 
 test:
 	./tools/test -no-go-get
