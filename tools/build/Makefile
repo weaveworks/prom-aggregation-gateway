@@ -3,15 +3,16 @@
 
 # Boiler plate for bulding Docker containers.
 # All this must go at top of file I'm afraid.
-IMAGE_PREFIX := quay.io/weaveworks/build-
+IMAGE_PREFIX := weaveworks/build-
 IMAGE_TAG := $(shell ../image-tag)
+GIT_REVISION := $(shell git rev-parse HEAD)
 UPTODATE := .uptodate
 
 # Every directory with a Dockerfile in it builds an image called
 # $(IMAGE_PREFIX)<dirname>. Dependencies (i.e. things that go in the image)
 # still need to be explicitly declared.
 %/$(UPTODATE): %/Dockerfile %/*
-	$(SUDO) docker build -t $(IMAGE_PREFIX)$(shell basename $(@D)) $(@D)/
+	$(SUDO) docker build --build-arg=revision=$(GIT_REVISION) -t $(IMAGE_PREFIX)$(shell basename $(@D)) $(@D)/
 	$(SUDO) docker tag $(IMAGE_PREFIX)$(shell basename $(@D)) $(IMAGE_PREFIX)$(shell basename $(@D)):$(IMAGE_TAG)
 	touch $@
 

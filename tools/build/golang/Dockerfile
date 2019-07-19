@@ -1,4 +1,4 @@
-FROM golang:1.9.2-stretch
+FROM golang:1.12.1-stretch
 RUN apt-get update && \
     apt-get install -y \
       curl \
@@ -30,7 +30,7 @@ RUN go get -tags netgo \
 		github.com/gogo/protobuf/gogoproto \
 		github.com/gogo/protobuf/protoc-gen-gogoslick \
 		github.com/golang/dep/... \
-		github.com/golang/lint/golint \
+		golang.org/x/lint/golint \
 		github.com/golang/protobuf/protoc-gen-go \
 		github.com/kisielk/errcheck \
 		github.com/mjibson/esc \
@@ -48,3 +48,10 @@ RUN mkdir -p /var/run/secrets/kubernetes.io/serviceaccount && \
 		touch /var/run/secrets/kubernetes.io/serviceaccount/token
 COPY build.sh /
 ENTRYPOINT ["/build.sh"]
+
+ARG revision
+LABEL maintainer="Weaveworks <help@weave.works>" \
+      org.opencontainers.image.title="golang" \
+      org.opencontainers.image.source="https://github.com/weaveworks/build-tools/tree/master/build/golang" \
+      org.opencontainers.image.revision="${revision}" \
+      org.opencontainers.image.vendor="Weaveworks"
