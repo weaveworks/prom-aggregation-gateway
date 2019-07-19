@@ -42,7 +42,7 @@ cmd/prom-aggregation-gateway/$(UPTODATE): $(PROM_AGG_GATEWAY_EXE)
 SUDO := $(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 BUILD_IN_CONTAINER := true
 RM := --rm
-GO_FLAGS := -ldflags "-extldflags \"-static\" -linkmode=external -s -w" -tags netgo -i
+GO_FLAGS := -ldflags "-extldflags \"-static\"" -tags netgo -i
 NETGO_CHECK = @strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	rm $@; \
 	echo "\nYour go standard library was built without the 'netgo' build tag."; \
