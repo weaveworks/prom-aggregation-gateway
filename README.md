@@ -55,3 +55,13 @@ To update the code in build-tools.git, the process is therefore:
 - PR into build-tools.git, go through normal review process etc.
 - Do `git subtree pull --prefix tools https://github.com/weaveworks/build-tools.git master --squash`
   in your repo, and PR that.
+
+## <a name="help"></a>Getting Help
+
+If you have any questions about, feedback for or problems with `build-tools`:
+
+- Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
+- Ask a question on the [#general](https://weave-community.slack.com/messages/general/) slack channel.
+- [File an issue](https://github.com/weaveworks/build-tools/issues/new).
+
+Your feedback is always welcome!
