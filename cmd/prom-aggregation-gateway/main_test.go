@@ -198,7 +198,7 @@ func TestAggate(t *testing.T) {
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
 	} {
-		a := newAggate()
+		a := NewAggate()
 
 		if err := a.parseAndMerge(strings.NewReader(c.a), url.Values{}, ""); err != nil {
 			if c.err1 == nil {
@@ -242,7 +242,7 @@ func TestAggateWithServerLabels(t *testing.T) {
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateErrorWithServerLabels), nil},
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResultWithServerLabels, nil, nil},
 	} {
-		a := newAggate()
+		a := NewAggate()
 
 		query := url.Values{}
 		query.Add("_label", "appversion:3.2")

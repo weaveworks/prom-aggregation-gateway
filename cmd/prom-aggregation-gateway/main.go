@@ -170,7 +170,7 @@ type aggate struct {
 	families     map[string]*dto.MetricFamily
 }
 
-func newAggate() *aggate {
+func NewAggate() *aggate {
 	return &aggate{
 		families: map[string]*dto.MetricFamily{},
 	}
@@ -284,7 +284,7 @@ func main() {
 	labelQueryParam := flag.String("label-query-param", "", "Append labels to metrics from query parameters <label-query-param>=<label-key>:<label-value>")
 	flag.Parse()
 
-	a := newAggate()
+	a := NewAggate()
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/api/ui/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
