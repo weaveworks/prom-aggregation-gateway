@@ -6,7 +6,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"sort"
+	"strings"
 	"sync"
 
 	dto "github.com/prometheus/client_model/go"
@@ -196,7 +198,20 @@ func validateFamily(f *dto.MetricFamily) error {
 	return nil
 }
 
-func (a *aggate) parseAndMerge(r io.Reader) error {
+func appendServerLabels(queryArguments url.Values, labelQueryParam string, metrics []*dto.Metric) {
+	for _, m := range metrics {
+		if _, foundLabel := queryArguments[labelQueryParam]; foundLabel {
+			for _, label := range queryArguments[labelQueryParam] {
+				l := strings.Split(label, ":")
+				if len(l) == 2 {
+					m.Label = append(m.Label, &dto.LabelPair{Name: &l[0], Value: &l[1]})
+				}
+			}
+		}
+	}
+}
+
+func (a *aggate) parseAndMerge(r io.Reader, queryArguments url.Values, labelQueryParam string) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -206,6 +221,11 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
 	for name, family := range inFamilies {
+		// Append labels server side by provided labels in labelQueryParam
+		if labelQueryParam != "" {
+			appendServerLabels(queryArguments, labelQueryParam, family.Metric)
+		}
+
 		// Sort labels in case source sends them inconsistently
 		for _, m := range family.Metric {
 			sort.Sort(byName(m.Label))
@@ -261,13 +281,14 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	listen := flag.String("listen", ":80", "Address and port to listen on.")
 	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
+	labelQueryParam := flag.String("label-query-param", "", "Append labels to metrics from query parameters <label-query-param>=<label-key>:<label-value>")
 	flag.Parse()
 
 	a := newAggate()
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/api/ui/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
-		if err := a.parseAndMerge(r.Body); err != nil {
+		if err := a.parseAndMerge(r.Body, r.URL.Query(), *labelQueryParam); err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
