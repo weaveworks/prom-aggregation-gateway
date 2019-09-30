@@ -200,20 +200,20 @@ func TestAggate(t *testing.T) {
 	} {
 		a := NewAggate()
 
-		if err := a.parseAndMerge(strings.NewReader(c.a), url.Values{}, ""); err != nil {
+		if err := a.ParseAndMerge(strings.NewReader(c.a), url.Values{}, ""); err != nil {
 			if c.err1 == nil {
 				t.Fatalf("Unexpected error: %s", err)
 			} else if c.err1.Error() != err.Error() {
 				t.Fatalf("Expected %s, got %s", c.err1, err)
 			}
 		}
-		if err := a.parseAndMerge(strings.NewReader(c.b), url.Values{}, ""); err != c.err2 {
+		if err := a.ParseAndMerge(strings.NewReader(c.b), url.Values{}, ""); err != c.err2 {
 			t.Fatalf("Expected %s, got %s", c.err2, err)
 		}
 
 		r := httptest.NewRequest("GET", "http://example.com/foo", nil)
 		w := httptest.NewRecorder()
-		a.handler(w, r)
+		a.Handler(w, r)
 
 		if have := w.Body.String(); have != c.want {
 			text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
@@ -247,20 +247,20 @@ func TestAggateWithServerLabels(t *testing.T) {
 		query := url.Values{}
 		query.Add("_label", "appversion:3.2")
 		query.Add("_label", "osversion:2")
-		if err := a.parseAndMerge(strings.NewReader(c.a), query, "_label"); err != nil {
+		if err := a.ParseAndMerge(strings.NewReader(c.a), query, "_label"); err != nil {
 			if c.err1 == nil {
 				t.Fatalf("Unexpected error: %s", err)
 			} else if c.err1.Error() != err.Error() {
 				t.Fatalf("Expected %s, got %s", c.err1, err)
 			}
 		}
-		if err := a.parseAndMerge(strings.NewReader(c.b), query, "_label"); err != c.err2 {
+		if err := a.ParseAndMerge(strings.NewReader(c.b), query, "_label"); err != c.err2 {
 			t.Fatalf("Expected %s, got %s", c.err2, err)
 		}
 
 		r := httptest.NewRequest("GET", "http://example.com/foo?_label=appversion:3.2&_label=osversion:2", nil)
 		w := httptest.NewRecorder()
-		a.handler(w, r)
+		a.Handler(w, r)
 
 		if have := w.Body.String(); have != c.want {
 			text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{

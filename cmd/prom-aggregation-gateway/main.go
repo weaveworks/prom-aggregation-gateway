@@ -211,7 +211,7 @@ func appendServerLabels(queryArguments url.Values, labelQueryParam string, metri
 	}
 }
 
-func (a *aggate) parseAndMerge(r io.Reader, queryArguments url.Values, labelQueryParam string) error {
+func (a *aggate) ParseAndMerge(r io.Reader, queryArguments url.Values, labelQueryParam string) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -255,7 +255,7 @@ func (a *aggate) parseAndMerge(r io.Reader, queryArguments url.Values, labelQuer
 	return nil
 }
 
-func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
+func (a *aggate) Handler(w http.ResponseWriter, r *http.Request) {
 	contentType := expfmt.Negotiate(r.Header)
 	w.Header().Set("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(w, contentType)
@@ -286,10 +286,10 @@ func main() {
 	flag.Parse()
 
 	a := NewAggate()
-	http.HandleFunc("/metrics", a.handler)
+	http.HandleFunc("/metrics", a.Handler)
 	http.HandleFunc(*apiEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
-		if err := a.parseAndMerge(r.Body, r.URL.Query(), *labelQueryParam); err != nil {
+		if err := a.ParseAndMerge(r.Body, r.URL.Query(), *labelQueryParam); err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
