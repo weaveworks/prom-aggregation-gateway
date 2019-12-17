@@ -7,6 +7,16 @@ Prometheus Aggregation Gateway is a aggregating push gateway for Prometheus.  As
 * Gauges are also added up (but this may not make any sense)
 * Summaries are discarded.
 
+## How to use
+
+Send metrics in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/) to `/api/ui/metrics`
+
+E.g. if you have the program running locally:
+
+    echo 'http_requests_total{method="post",code="200"} 1027' | curl --data-binary @- http://localhost/api/ui/metrics
+
+Then have your Prometheus scrape metrics from the same address at `/metrics`.
+
 ## Ready-built images
 
 Available on DockerHub `weaveworks/prom-aggregation-gateway`
