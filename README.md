@@ -35,6 +35,13 @@ This restriction makes the Prometheus pushgateway inappropriate for the usecase 
 
 See https://github.com/weaveworks/promjs/ for a JS client library for Prometheus that can be used from within a web app.
 
+## Getting Started
+Mostly, registering metrics and pushing are the same as the official push gateway
+with a few differences:  
+- There is no job and metrics namespace needed as required by the official one.
+- To push metrics, point to this endpoint `/api/ui/metrics`. 
+- Use `text/plain` as Content-Type and encode body as text.   
+
 ## <a name="help"></a>Getting Help
 
 If you have any questions about, feedback for or problems with `prom-aggregation-gateway`:
