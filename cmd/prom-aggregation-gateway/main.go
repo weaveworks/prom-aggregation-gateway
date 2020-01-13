@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"sort"
 	"sync"
 
+	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -196,13 +198,42 @@ func validateFamily(f *dto.MetricFamily) error {
 	return nil
 }
 
-func (a *aggate) parseAndMerge(r io.Reader) error {
-	var parser expfmt.TextParser
-	inFamilies, err := parser.TextToMetricFamilies(r)
+func (a *aggate) parseAndMerge(r *http.Request) error {
+	inFamilies, err := a.parse(r)
 	if err != nil {
 		return err
 	}
+	return a.merge(inFamilies)
+}
 
+func (a *aggate) parse(r *http.Request) (map[string]*dto.MetricFamily, error) {
+	var metricFamilies map[string]*dto.MetricFamily
+	ctMediatype, ctParams, ctErr := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if ctErr == nil && ctMediatype == "application/vnd.google.protobuf" &&
+		ctParams["encoding"] == "delimited" &&
+		ctParams["proto"] == "io.prometheus.client.MetricFamily" {
+		metricFamilies = map[string]*dto.MetricFamily{}
+		var err error
+		for {
+			mf := &dto.MetricFamily{}
+			if _, err = pbutil.ReadDelimited(r.Body, mf); err != nil {
+				if err == io.EOF {
+					err = nil
+				}
+				break
+			}
+			metricFamilies[mf.GetName()] = mf
+		}
+		return metricFamilies, err
+	}
+	// We could do further content-type checks here, but the
+	// fallback for now will anyway be the text format
+	// version 0.0.4, so just go for it and see if it works.
+	var parser expfmt.TextParser
+	return parser.TextToMetricFamilies(r.Body)
+}
+
+func (a *aggate) merge(inFamilies map[string]*dto.MetricFamily) error {
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
 	for name, family := range inFamilies {
@@ -267,7 +298,7 @@ func main() {
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/api/ui/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
-		if err := a.parseAndMerge(r.Body); err != nil {
+		if err := a.parseAndMerge(r); err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/prometheus/common/expfmt"
 )
 
 const (
@@ -140,6 +145,41 @@ counter{a="a",b="b"} 3
 `
 )
 
+const contentTypeProtobuf = "application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited"
+const contentTypeText = "Content-Type: text/html; charset=UTF-8"
+
+func convertToProtobufFormat(t *testing.T, metrics string) io.Reader {
+	var parser expfmt.TextParser
+	inFamilies, err := parser.TextToMetricFamilies(strings.NewReader(metrics))
+	if err != nil {
+		t.Fatal(err)
+		return nil
+	}
+	buf := &bytes.Buffer{}
+	for _, inFamily := range inFamilies {
+		_, err = pbutil.WriteDelimited(buf, inFamily)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return buf
+}
+
+func createPushRequest(t *testing.T, metrics string, contentType string) *http.Request {
+	var data io.Reader
+	if contentType == contentTypeProtobuf {
+		data = convertToProtobufFormat(t, metrics)
+	} else if contentType == contentTypeText {
+		data = strings.NewReader(metrics)
+	} else {
+		t.Logf("Can't create push request with content type: %s", contentType)
+		t.Fail()
+	}
+	req := httptest.NewRequest("POST", "http://example.com/bar", data)
+	req.Header.Set("Content-Type", contentType)
+	return req
+}
+
 func TestAggate(t *testing.T) {
 	for _, c := range []struct {
 		a, b string
@@ -154,32 +194,33 @@ func TestAggate(t *testing.T) {
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
 	} {
-		a := newAggate()
-
-		if err := a.parseAndMerge(strings.NewReader(c.a)); err != nil {
-			if c.err1 == nil {
-				t.Fatalf("Unexpected error: %s", err)
-			} else if c.err1.Error() != err.Error() {
-				t.Fatalf("Expected %s, got %s", c.err1, err)
+		for _, contentType := range []string{contentTypeText, contentTypeProtobuf} {
+			a := newAggate()
+			if err := a.parseAndMerge(createPushRequest(t, c.a, contentType)); err != nil {
+				if c.err1 == nil {
+					t.Fatalf("Unexpected error: %s", err)
+				} else if c.err1.Error() != err.Error() {
+					t.Fatalf("Expected %s, got %s", c.err1, err)
+				}
 			}
-		}
-		if err := a.parseAndMerge(strings.NewReader(c.b)); err != c.err2 {
-			t.Fatalf("Expected %s, got %s", c.err2, err)
-		}
+			if err := a.parseAndMerge(createPushRequest(t, c.b, contentType)); err != c.err2 {
+				t.Fatalf("Expected %s, got %s", c.err2, err)
+			}
 
-		r := httptest.NewRequest("GET", "http://example.com/foo", nil)
-		w := httptest.NewRecorder()
-		a.handler(w, r)
+			r := httptest.NewRequest("GET", "http://example.com/foo", nil)
+			w := httptest.NewRecorder()
+			a.handler(w, r)
 
-		if have := w.Body.String(); have != c.want {
-			text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-				A:        difflib.SplitLines(c.want),
-				B:        difflib.SplitLines(have),
-				FromFile: "want",
-				ToFile:   "have",
-				Context:  3,
-			})
-			t.Fatal(text)
+			if have := w.Body.String(); have != c.want {
+				text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+					A:        difflib.SplitLines(c.want),
+					B:        difflib.SplitLines(have),
+					FromFile: "want",
+					ToFile:   "have",
+					Context:  3,
+				})
+				t.Fatal(text)
+			}
 		}
 	}
 }
