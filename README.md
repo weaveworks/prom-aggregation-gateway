@@ -9,13 +9,27 @@ Prometheus Aggregation Gateway is a aggregating push gateway for Prometheus.  As
 
 ## How to use
 
-Send metrics in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/) to `/api/ui/metrics`
+Send metrics in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/) to `/metrics/`
 
 E.g. if you have the program running locally:
 
-    echo 'http_requests_total{method="post",code="200"} 1027' | curl --data-binary @- http://localhost/api/ui/metrics
+```bash
+echo 'http_requests_total{method="post",code="200"} 1027' | curl --data-binary @- http://localhost/metrics/
+```
 
-Then have your Prometheus scrape metrics from the same address at `/metrics`.
+As `prom-aggregation-gateway` is compatible with `prometheus/pushgateway` in terms of protocol and API, you can push your metrics using your favorite Prometheus client.
+
+E.g. in Python using [prometheus/client_python](https://github.com/prometheus/client_python):
+
+```python
+from prometheus_client import CollectorRegistry, Counter, push_to_gateway
+registry = CollectorRegistry()
+counter = Counter('some_counter', "A counter", registry=registry)
+counter.inc()
+push_to_gateway('localhost', job='my_job_name', registry=registry)
+```
+
+Then have your Prometheus scrape metrics at `/metrics`.
 
 ## Ready-built images
 
