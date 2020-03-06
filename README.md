@@ -31,6 +31,14 @@ push_to_gateway('localhost', job='my_job_name', registry=registry)
 
 Then have your Prometheus scrape metrics at `/metrics`.
 
+### Change listen port
+You can use `PORT` environment variable for change listen port. 
+
+For example:
+```bash
+docker run --rm -e PORT=9091 -d -p 9091:9091 weaveworks/prom-aggregation-gateway
+```
+
 ## Ready-built images
 
 Available on DockerHub `weaveworks/prom-aggregation-gateway`
