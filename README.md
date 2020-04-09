@@ -17,7 +17,7 @@ E.g. if you have the program running locally:
 echo 'http_requests_total{method="post",code="200"} 1027' | curl --data-binary @- http://localhost/metrics/
 ```
 
-As `prom-aggregation-gateway` is compatible with `prometheus/pushgateway` in terms of protocol and API, you can push your metrics using your favorite Prometheus client.
+Now you can push your metrics using your favorite Prometheus client.
 
 E.g. in Python using [prometheus/client_python](https://github.com/prometheus/client_python):
 
@@ -35,7 +35,7 @@ Then have your Prometheus scrape metrics at `/metrics`.
 
 Available on DockerHub `weaveworks/prom-aggregation-gateway`
 
-## Motivation
+## Comparison to [Prometheus Pushgateway](https://github.com/prometheus/pushgateway)
 
 According to https://prometheus.io/docs/practices/pushing/:
 
@@ -44,6 +44,8 @@ According to https://prometheus.io/docs/practices/pushing/:
 > The latter point is especially relevant when multiple instances of a job differentiate their metrics in the Pushgateway via an instance label or similar.
 
 This restriction makes the Prometheus pushgateway inappropriate for the usecase of accepting metrics from a client-side web app, so we created this one to aggregate counters from multiple senders.
+
+Prom-aggregation-gateway presents a similar API, but does not attempt to be a drop-in replacement.
 
 ## JS Client Library
 
