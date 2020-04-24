@@ -1,5 +1,10 @@
 # Prometheus Aggregation Gateway
 
+_NOTE_ - this is a privoro fork of `prometheus-aggregation-gateway` which adds the ability to run a cron job to reset the cached data contained in the gateway
+See `./prometheus-aggregation-gateway -crontab "*/5 * * * *` option!
+
+... _ORIGINAL README CONTINUES_ ...
+
 Prometheus Aggregation Gateway is a aggregating push gateway for Prometheus.  As opposed to the official [Prometheus Pushgateway](https://github.com/prometheus/pushgateway), this service aggregates the sample values it receives.
 
 * Counters where all labels match are added up.

@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sort"
 	"sync"
@@ -12,7 +11,13 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
+	
+	"github.com/robfig/cron"
+	log "github.com/sirupsen/logrus"
 )
+
+// need this scope for cbs to reset data structure
+var a = newAggate()
 
 func lablesLessThan(a, b []*dto.LabelPair) bool {
 	i, j := 0, 0
@@ -258,23 +263,49 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 	// TODO reset gauges
 }
 
+func init() {
+	log.SetLevel(log.InfoLevel)
+	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
+	log.Info("finished init")
+}
+
+func printCronEntries(cronEntries []cron.Entry) {
+	log.Infof("Cron Info: %+v\n", cronEntries)
+}
+
 func main() {
-	listen := flag.String("listen", ":80", "Address and port to listen on.")
+
+	log.Info("Main Start")
+	
+	listen := flag.String("listen", ":8088", "Address and port to listen on.")
 	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
 	pushPath := flag.String("push-path", "/metrics/", "HTTP path to accept pushed metrics.")
+	crontab := flag.String("crontab", "*/5 * * * *", "crontab formatted cronjob timing of cache reset.")
 	flag.Parse()
 
-	a := newAggate()
-	// new endpoint - serves when service started/ will restart again
-	// ** can metrics post return this instead of new one?handler
+	// we want a concurrent cron to be able to wipe the cache so we can synchronize lambdas to aggregate on a tick, then clear for the next tick
+	// reasoning - if we get mulitple self-scrapes of data for any given lambda invocation within a cron period, we'll get duplicated data
+	// 
+	// /metrics endpoint will also return a timestamp of the next 'data wipe' timing, so lambda callers will know not to send stats until after each period reset
+	// lifecycle = lambda req made -> lambda will post stats, gets ts value in aggregator response POST. lambda now can't post again till after that ts
+
+	// cron format per unix cron utility https://en.wikipedia.org/wiki/Cron
+	cronJob := cron.New()
+	cronJob.AddFunc(*crontab, func() { 
+		log.Info("[Cron Job]Every 5 minutes, wipe cache.\n")
+		printCronEntries(cronJob.Entries())
+		// TODO - save 'nextTimestamp' for POST handler to return
+		log.Infof("Next cron runs at: %+v typeformat: %T\n", cronJob.Entries()[0].Next, cronJob.Entries()[0].Next)
+		// wipe data structure that's keeping tallies
+		a.families = map[string]*dto.MetricFamily{}
+	})
+
+	// Start cron with our specified job
+	log.Info("Start cron")
+	cronJob.Start()
+	printCronEntries(cronJob.Entries())
 	
-	// on the other side when lambda starts, it will read response from this endpoint
-	// lambda will react to this info by never POSTing again until after timestamp specified
-
-	// lifecycle = lambda req made -> lambda will post stats, gets ts value. can't post again till after
-
-	// start some other concurrent timer thing, on bleep - newAggate object, wipe old
-
+	// setup http handlers
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc(*pushPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
