@@ -1,3 +1,4 @@
 .pkg
 .uptodate
 cmd/prom-aggregation-gateway/prom-aggregation-gateway
+.cache
