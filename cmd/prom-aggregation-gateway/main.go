@@ -265,6 +265,16 @@ func main() {
 	flag.Parse()
 
 	a := newAggate()
+	// new endpoint - serves when service started/ will restart again
+	// ** can metrics post return this instead of new one?handler
+	
+	// on the other side when lambda starts, it will read response from this endpoint
+	// lambda will react to this info by never POSTing again until after timestamp specified
+
+	// lifecycle = lambda req made -> lambda will post stats, gets ts value. can't post again till after
+
+	// start some other concurrent timer thing, on bleep - newAggate object, wipe old
+
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc(*pushPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
