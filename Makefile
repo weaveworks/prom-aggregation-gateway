@@ -1,7 +1,6 @@
 .PHONY: help
 
-ENVIRONMENT ?= "dev"
-IMAGE_NAME ?= "larktech/wagtail"
+IMAGE_NAME ?= "larktech/prom-aggregation-gateway"
 IMAGE_TAG ?= "latest"
 
 help:

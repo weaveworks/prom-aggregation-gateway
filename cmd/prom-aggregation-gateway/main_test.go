@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -61,7 +60,7 @@ histogram_count 1
 counter 60
 # HELP gauge A gauge
 # TYPE gauge gauge
-gauge 99
+gauge 49.5
 # HELP histogram A histogram
 # TYPE histogram histogram
 histogram_bucket{le="1"} 0
@@ -114,9 +113,9 @@ ui_external_lib_loaded{name="mixpanel",loaded="true"} 1
 `
 	gaugeOutput = `# HELP ui_external_lib_loaded A gauge with entries in un-sorted order
 # TYPE ui_external_lib_loaded gauge
-ui_external_lib_loaded{loaded="true",name="Intercom"} 2
-ui_external_lib_loaded{loaded="true",name="ga"} 2
-ui_external_lib_loaded{loaded="true",name="mixpanel"} 2
+ui_external_lib_loaded{loaded="true",name="Intercom"} 1
+ui_external_lib_loaded{loaded="true",name="ga"} 1
+ui_external_lib_loaded{loaded="true",name="mixpanel"} 1
 `
 	duplicateLabels = `
 # HELP ui_external_lib_loaded Test with duplicate values
@@ -124,7 +123,7 @@ ui_external_lib_loaded{loaded="true",name="mixpanel"} 2
 ui_external_lib_loaded{name="Munchkin",loaded="true"} 15171
 ui_external_lib_loaded{name="Munchkin",loaded="true"} 1
 `
-	duplicateError = `Duplicate labels: {__name__="ui_external_lib_loaded", loaded="true", name="Munchkin"}`
+	duplicateErrorPrefix = `Duplicate labels`
 
 	reorderedLabels1 = `# HELP counter A counter
 # TYPE counter counter
@@ -142,29 +141,32 @@ counter{a="a",b="b"} 3
 
 func TestAggate(t *testing.T) {
 	for _, c := range []struct {
-		a, b string
-		want string
-		err1 error
-		err2 error
+		a, b        string
+		want        string
+		errorPrefix string
+		err2        error
 	}{
-		{gaugeInput, gaugeInput, gaugeOutput, nil, nil},
-		{in1, in2, want, nil, nil},
-		{multilabel1, multilabel2, multilabelResult, nil, nil},
-		{labelFields1, labelFields2, labelFieldResult, nil, nil},
-		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
-		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
+		{gaugeInput, gaugeInput, gaugeOutput, "", nil},
+		{in1, in2, want, "", nil},
+		{multilabel1, multilabel2, multilabelResult, "", nil},
+		{labelFields1, labelFields2, labelFieldResult, "", nil},
+		{duplicateLabels, "", "", duplicateErrorPrefix, nil},
+		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, "", nil},
 	} {
 		a := newAggate()
 
 		if err := a.parseAndMerge(strings.NewReader(c.a)); err != nil {
-			if c.err1 == nil {
-				t.Fatalf("Unexpected error: %s", err)
-			} else if c.err1.Error() != err.Error() {
-				t.Fatalf("Expected %s, got %s", c.err1, err)
+			if c.errorPrefix == "" {
+				t.Logf("Unexpected error: %s", err)
+				t.Fail()
+			} else if !strings.HasPrefix(err.Error(), c.errorPrefix) {
+				t.Logf("Expected error starting with %s, got %s", c.errorPrefix, err.Error())
+				t.Fail()
 			}
 		}
 		if err := a.parseAndMerge(strings.NewReader(c.b)); err != c.err2 {
-			t.Fatalf("Expected %s, got %s", c.err2, err)
+			t.Logf("Expected %s, got %s", c.err2, err)
+			t.Fail()
 		}
 
 		r := httptest.NewRequest("GET", "http://example.com/foo", nil)
@@ -179,7 +181,8 @@ func TestAggate(t *testing.T) {
 				ToFile:   "have",
 				Context:  3,
 			})
-			t.Fatal(text)
+			t.Log(text)
+			t.Fail()
 		}
 	}
 }

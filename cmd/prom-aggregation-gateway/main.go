@@ -78,7 +78,7 @@ func mergeBuckets(a, b []*dto.Bucket) []*dto.Bucket {
 	return output
 }
 
-func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
+func mergeMetric(ty dto.MetricType, count int, a, b *dto.Metric) *dto.Metric {
 	switch ty {
 	case dto.MetricType_COUNTER:
 		return &dto.Metric{
@@ -89,13 +89,11 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 		}
 
 	case dto.MetricType_GAUGE:
-		// No very meaninful way for us to merge gauges.  We'll sum them
-		// and clear out any gauges on scrape, as a best approximation, but
-		// this relies on client pushing with the same interval as we scrape.
+		// Average out value
 		return &dto.Metric{
 			Label: a.Label,
 			Gauge: &dto.Gauge{
-				Value: float64ptr(*a.Gauge.Value + *b.Gauge.Value),
+				Value: float64ptr((*a.Gauge.Value*(float64(count)-1) + *b.Gauge.Value) / float64(count)),
 			},
 		}
 
@@ -125,75 +123,102 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 	return nil
 }
 
-func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
-	if *a.Type != *b.Type {
-		return nil, fmt.Errorf("Cannot merge metric '%s': type %s != %s",
-			*a.Name, a.Type.String(), b.Type.String())
-	}
+// Takes a new family (nf) and adds it to an existing family (nf)
+func (a *aggate) mergeFamily(nf *dto.MetricFamily) error {
 
-	output := &dto.MetricFamily{
-		Name: a.Name,
-		Help: a.Help,
-		Type: a.Type,
-	}
+	metrics := make(map[model.Fingerprint]*dto.Metric)
 
-	i, j := 0, 0
-	for i < len(a.Metric) && j < len(b.Metric) {
-		if lablesLessThan(a.Metric[i].Label, b.Metric[j].Label) {
-			output.Metric = append(output.Metric, a.Metric[i])
-			i++
-		} else if lablesLessThan(b.Metric[j].Label, a.Metric[i].Label) {
-			output.Metric = append(output.Metric, b.Metric[j])
-			j++
-		} else {
-			merged := mergeMetric(*a.Type, a.Metric[i], b.Metric[j])
-			if merged != nil {
-				output.Metric = append(output.Metric, merged)
+	// Add exiting metrics
+	ef, ok := a.families[*nf.Name]
+	if ok {
+
+		// Check the metric types
+		if *ef.Type != *nf.Type {
+			return fmt.Errorf("Cannot merge metric '%s': type %s != %s",
+				*ef.Name, ef.Type.String(), nf.Type.String())
+		}
+
+		for _, m := range ef.Metric {
+			fp, err := fingerprint(*ef.Name, m)
+			if err != nil {
+				return err
 			}
-			i++
-			j++
+			metrics[fp] = m
 		}
 	}
-	for ; i < len(a.Metric); i++ {
-		output.Metric = append(output.Metric, a.Metric[i])
+
+	// Merge or add new Metrics
+	for _, m := range nf.Metric {
+
+		fp, err := fingerprint(*nf.Name, m)
+		if err != nil {
+			return err
+		}
+		// Add count to fingerprints
+		a.fingerprintCounts[fp]++
+
+		oldMetric, ok := metrics[fp]
+		if ok {
+			metrics[fp] = mergeMetric(*nf.Type, a.fingerprintCounts[fp], oldMetric, m)
+		} else {
+			metrics[fp] = m
+		}
 	}
-	for ; j < len(b.Metric); j++ {
-		output.Metric = append(output.Metric, b.Metric[j])
+
+	// Add the metrics back
+	nf.Metric = []*dto.Metric{}
+	for _, m := range metrics {
+
+		sort.Sort(byName(m.Label)) // Sort metrics labels
+		nf.Metric = append(nf.Metric, m)
 	}
-	return output, nil
+
+	sort.Sort(byLabel(nf.Metric)) // Sort metrics
+	a.families[*nf.Name] = nf
+
+	return nil
 }
 
-type aggate struct {
-	familiesLock sync.RWMutex
-	families     map[string]*dto.MetricFamily
-}
-
-func newAggate() *aggate {
-	return &aggate{
-		families: map[string]*dto.MetricFamily{},
+func fingerprint(name string, m *dto.Metric) (f model.Fingerprint, err error) {
+	lset := make(model.LabelSet, len(m.Label)+1)
+	for _, p := range m.Label {
+		lset[model.LabelName(p.GetName())] = model.LabelValue(p.GetValue())
 	}
+	lset[model.MetricNameLabel] = model.LabelValue(name)
+	if err := lset.Validate(); err != nil {
+		return f, err
+	}
+	return lset.Fingerprint(), nil
 }
 
 func validateFamily(f *dto.MetricFamily) error {
 	// Map of fingerprints we've seen before in this family
 	fingerprints := make(map[model.Fingerprint]struct{}, len(f.Metric))
 	for _, m := range f.Metric {
-		// Turn protobuf LabelSet into Prometheus model LabelSet
-		lset := make(model.LabelSet, len(m.Label)+1)
-		for _, p := range m.Label {
-			lset[model.LabelName(p.GetName())] = model.LabelValue(p.GetValue())
-		}
-		lset[model.MetricNameLabel] = model.LabelValue(f.GetName())
-		if err := lset.Validate(); err != nil {
+
+		fingerprint, err := fingerprint(f.GetName(), m)
+		if err != nil {
 			return err
 		}
-		fingerprint := lset.Fingerprint()
 		if _, found := fingerprints[fingerprint]; found {
-			return fmt.Errorf("Duplicate labels: %v", lset)
+			return fmt.Errorf("Duplicate labels: %v", m)
 		}
 		fingerprints[fingerprint] = struct{}{}
 	}
 	return nil
+}
+
+type aggate struct {
+	sync.RWMutex
+	families          map[string]*dto.MetricFamily
+	fingerprintCounts map[model.Fingerprint]int
+}
+
+func newAggate() *aggate {
+	return &aggate{
+		families:          map[string]*dto.MetricFamily{},
+		fingerprintCounts: make(map[model.Fingerprint]int),
+	}
 }
 
 func (a *aggate) parseAndMerge(r io.Reader) error {
@@ -203,33 +228,17 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 		return err
 	}
 
-	a.familiesLock.Lock()
-	defer a.familiesLock.Unlock()
-	for name, family := range inFamilies {
-		// Sort labels in case source sends them inconsistently
-		for _, m := range family.Metric {
-			sort.Sort(byName(m.Label))
-		}
+	a.Lock()
+	defer a.Unlock()
+	for _, family := range inFamilies {
 
 		if err := validateFamily(family); err != nil {
 			return err
 		}
 
-		// family must be sorted for the merge
-		sort.Sort(byLabel(family.Metric))
-
-		existingFamily, ok := a.families[name]
-		if !ok {
-			a.families[name] = family
-			continue
-		}
-
-		merged, err := mergeFamily(existingFamily, family)
-		if err != nil {
+		if err := a.mergeFamily(family); err != nil {
 			return err
 		}
-
-		a.families[name] = merged
 	}
 
 	return nil
@@ -240,8 +249,9 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(w, contentType)
 
-	a.familiesLock.RLock()
-	defer a.familiesLock.RUnlock()
+	a.Lock()
+	defer a.Unlock()
+
 	metricNames := []string{}
 	for name := range a.families {
 		metricNames = append(metricNames, name)
@@ -255,7 +265,9 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// TODO reset gauges
+	// reset gauges
+	a.families = map[string]*dto.MetricFamily{}
+	a.fingerprintCounts = make(map[model.Fingerprint]int)
 }
 
 func main() {
