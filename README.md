@@ -9,12 +9,12 @@ Prometheus Aggregation Gateway is a aggregating push gateway for Prometheus.  As
 
 ## How to use
 
-Send metrics in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/) to `/metrics/`
+Send metrics in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/) to `/metrics_push`
 
 E.g. if you have the program running locally:
 
 ```bash
-echo 'http_requests_total{method="post",code="200"} 1027' | curl --data-binary @- http://localhost/metrics/
+echo 'http_requests_total{method="post",code="200"} 1027' | curl --data-binary @- http://localhost/metrics_push
 ```
 
 Now you can push your metrics using your favorite Prometheus client.
