@@ -138,6 +138,20 @@ counter{b="b",a="a"} 2
 # TYPE counter counter
 counter{a="a",b="b"} 3
 `
+
+	summaryInput = `# HELP cpu_temperature_celsius Current temperature of the CPU.
+# TYPE cpu_temperature_celsius summary
+cpu_temperature_celsius_sum 30.2
+cpu_temperature_celsius_count 1
+# HELP counter A counter
+# TYPE counter counter
+counter 1
+`
+
+	summaryDiscardedOutput = `# HELP counter A counter
+# TYPE counter counter
+counter 2
+`
 )
 
 func TestAggate(t *testing.T) {
@@ -153,6 +167,7 @@ func TestAggate(t *testing.T) {
 		{labelFields1, labelFields2, labelFieldResult, nil, nil},
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
+		{summaryInput, summaryInput, summaryDiscardedOutput, nil, nil},
 	} {
 		a := newAggate()
 
