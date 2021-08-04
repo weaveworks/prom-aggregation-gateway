@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sort"
@@ -12,7 +13,29 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
+	yaml "gopkg.in/yaml.v2"
 )
+
+type Config struct {
+	Port string `yaml:"port"`
+}
+
+func ReadConfig(filename string) (*Config, error) {
+	raw, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %s", err)
+	}
+
+	var config Config
+	if err = yaml.Unmarshal(raw, &config); err != nil {
+		return nil, fmt.Errorf("cannot parse %q file: %v", filename, err)
+	}
+
+	if len(config.Port) == 0 {
+		return nil, fmt.Errorf("port must not be empty")
+	}
+	return &config, nil
+}
 
 func lablesLessThan(a, b []*dto.LabelPair) bool {
 	i, j := 0, 0
@@ -265,7 +288,23 @@ func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	listen := flag.String("listen", ":80", "Address and port to listen on.")
+	var configFile string
+
+	flag.StringVar(&configFile, "config", "config.yaml", "config file path")
+	flag.Parse()
+
+	if configFile == "" {
+		log.Print(`Config path is empty, using default "config.yaml"`)
+		configFile = "config.yaml"
+	}
+
+	// read and parse the config file
+	cfg, err := ReadConfig(configFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("port: %s", cfg.Port)
+	listen := flag.String("listen", fmt.Sprintf(":%s", cfg.Port), "Address and port to listen on.")
 	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
 	pushPath := flag.String("push-path", "/metrics/", "HTTP path to accept pushed metrics.")
 	flag.Parse()
