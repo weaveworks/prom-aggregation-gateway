@@ -1,0 +1,19 @@
+make: Entering directory `/Users/nicaciooliveira/vtex/webops/repos/prom-aggregation-gateway-fork'
+docker build -t docker.io/weaveworks/aggate-build aggate-build/
+docker tag docker.io/weaveworks/aggate-build docker.io/weaveworks/aggate-build:master-c4415bbe
+ 
+touch aggate-build/.uptodate
+ 
+mkdir -p /Users/nicaciooliveira/vtex/webops/repos/prom-aggregation-gateway-fork/.pkg
+docker run --rm -ti \
+		-v /Users/nicaciooliveira/vtex/webops/repos/prom-aggregation-gateway-fork/.pkg:/go/pkg \
+		-v /Users/nicaciooliveira/vtex/webops/repos/prom-aggregation-gateway-fork:/go/src/github.com/weaveworks/prom-aggregation-gateway \
+		-e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR \
+		docker.io/weaveworks/aggate-build cmd/prom-aggregation-gateway/prom-aggregation-gateway
+ 
+docker build -t docker.io/weaveworks/prom-aggregation-gateway cmd/prom-aggregation-gateway/
+docker tag docker.io/weaveworks/prom-aggregation-gateway docker.io/weaveworks/prom-aggregation-gateway:master-c4415bbe
+ 
+touch cmd/prom-aggregation-gateway/.uptodate
+make: Leaving directory `/Users/nicaciooliveira/vtex/webops/repos/prom-aggregation-gateway-fork'
+ 

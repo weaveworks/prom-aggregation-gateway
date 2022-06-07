@@ -1,0 +1,8 @@
+{
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#073516",
+        "titleBar.activeBackground": "#094A1F",
+        "titleBar.activeForeground": "#F1FDF5"
+    },
+    "makefile.extensionOutputFolder": "./.vscode"
+}

@@ -1,0 +1,1 @@
+{"buildTargets":["aggate-build/.uptodate","all","clean","cmd/prom-aggregation-gateway/.uptodate","cmd/prom-aggregation-gateway/prom-aggregation-gateway","images","lint","test"],"launchTargets":[],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":[],"compilerArgs":[]},"fileIndex":[]}}
