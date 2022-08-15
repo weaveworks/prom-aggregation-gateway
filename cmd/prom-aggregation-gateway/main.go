@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -78,7 +79,18 @@ func mergeBuckets(a, b []*dto.Bucket) []*dto.Bucket {
 	return output
 }
 
+func makeTimestampMs() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
 func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
+	// Getting the metric timestamp or creating one when that metric is merged
+	// It will be used to cleanup old metrics that have not been merged lately
+	metricTimestamp := b.GetTimestampMs()
+	if metricTimestamp == 0 {
+		metricTimestamp = makeTimestampMs()
+	}
+
 	switch ty {
 	case dto.MetricType_COUNTER:
 		return &dto.Metric{
@@ -86,6 +98,7 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 			Counter: &dto.Counter{
 				Value: float64ptr(*a.Counter.Value + *b.Counter.Value),
 			},
+			TimestampMs: &metricTimestamp,
 		}
 
 	case dto.MetricType_GAUGE:
@@ -97,6 +110,7 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 			Gauge: &dto.Gauge{
 				Value: float64ptr(*a.Gauge.Value + *b.Gauge.Value),
 			},
+			TimestampMs: &metricTimestamp,
 		}
 
 	case dto.MetricType_HISTOGRAM:
@@ -107,6 +121,7 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 				SampleSum:   float64ptr(*a.Histogram.SampleSum + *b.Histogram.SampleSum),
 				Bucket:      mergeBuckets(a.Histogram.Bucket, b.Histogram.Bucket),
 			},
+			TimestampMs: &metricTimestamp,
 		}
 
 	case dto.MetricType_UNTYPED:
@@ -115,6 +130,7 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 			Untyped: &dto.Untyped{
 				Value: float64ptr(*a.Untyped.Value + *b.Untyped.Value),
 			},
+			TimestampMs: &metricTimestamp,
 		}
 
 	case dto.MetricType_SUMMARY:
@@ -164,13 +180,15 @@ func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 }
 
 type aggate struct {
+	timeToLive   time.Duration
 	familiesLock sync.RWMutex
 	families     map[string]*dto.MetricFamily
 }
 
-func newAggate() *aggate {
+func newAggate(ttl time.Duration) *aggate {
 	return &aggate{
-		families: map[string]*dto.MetricFamily{},
+		timeToLive: ttl,
+		families:   map[string]*dto.MetricFamily{},
 	}
 }
 
@@ -194,6 +212,21 @@ func validateFamily(f *dto.MetricFamily) error {
 		fingerprints[fingerprint] = struct{}{}
 	}
 	return nil
+}
+
+func cleanupFamily(metrics []*dto.Metric, ttl int64) []*dto.Metric {
+	// CurrentTS for old metrics check
+	nowTS := makeTimestampMs()
+
+	// Iterating over metrics and filtering out the old, not recently merged ones
+	var updatedMetrics []*dto.Metric
+	for _, metric := range metrics {
+		if nowTS-metric.GetTimestampMs() <= ttl {
+			updatedMetrics = append(updatedMetrics, metric)
+		}
+	}
+
+	return updatedMetrics
 }
 
 func (a *aggate) parseAndMerge(r io.Reader) error {
@@ -240,11 +273,20 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(w, contentType)
 
-	a.familiesLock.RLock()
-	defer a.familiesLock.RUnlock()
+	a.familiesLock.Lock()
+	defer a.familiesLock.Unlock()
 	metricNames := []string{}
 	for name := range a.families {
-		metricNames = append(metricNames, name)
+		// Cleaning up metrics that have not been merged for a while
+		a.families[name].Metric = cleanupFamily(a.families[name].GetMetric(), a.timeToLive.Milliseconds())
+
+		// Including only families that still have metrics to be scraped
+		if len(a.families[name].Metric) > 0 {
+			metricNames = append(metricNames, name)
+		} else {
+			// Remove the empty families
+			delete(a.families, name)
+		}
 	}
 	sort.Sort(sort.StringSlice(metricNames))
 
@@ -268,9 +310,10 @@ func main() {
 	listen := flag.String("listen", ":80", "Address and port to listen on.")
 	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
 	pushPath := flag.String("push-path", "/metrics/", "HTTP path to accept pushed metrics.")
+	timeToLive := flag.Duration("ttl", 3600*time.Second, "How long unmerged metrics will live, in milliseconds (default 1h)")
 	flag.Parse()
 
-	a := newAggate()
+	a := newAggate(*timeToLive)
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/-/healthy", handleHealthCheck)
 	http.HandleFunc("/-/ready", handleHealthCheck)
