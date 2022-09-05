@@ -216,29 +216,6 @@ func validateFamily(f *dto.MetricFamily) error {
 	return nil
 }
 
-func (a *aggate) cleanupFamily(metrics []*dto.Metric, ttl time.Duration) ([]*dto.Metric, int) {
-	// CurrentTS for old metrics check
-	nowTS := makeTimestampSec()
-
-	// Iterating over metrics and filtering out the old, not recently merged ones
-	var updatedMetrics []*dto.Metric
-	metricsDeleted := 0
-	for _, metric := range metrics {
-		pushJobId := getMetricPushJobId(metric)
-		if pushJobId != nil {
-			if lastPushTimestampSec, ok := a.pushJobsTimestamps[*pushJobId]; ok {
-				if time.Duration(nowTS-lastPushTimestampSec)*time.Second <= ttl {
-					updatedMetrics = append(updatedMetrics, metric)
-				} else {
-					metricsDeleted++
-				}
-			}
-		}
-	}
-
-	return updatedMetrics, metricsDeleted
-}
-
 func getMetricPushJobId(metric *dto.Metric) *string {
 	for _, label := range metric.GetLabel() {
 		if *label.Name == "pushJobId" {
@@ -247,6 +224,7 @@ func getMetricPushJobId(metric *dto.Metric) *string {
 	}
 	return nil
 }
+
 func (a *aggate) parseAndMerge(r io.Reader, jobId string) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
@@ -319,6 +297,29 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 	// TODO reset gauges
 }
 
+func (a *aggate) cleanupFamily(metrics []*dto.Metric, ttl time.Duration) ([]*dto.Metric, int) {
+	// CurrentTS for old metrics check
+	nowTS := makeTimestampSec()
+
+	// Iterating over metrics and filtering out the old, not recently merged ones
+	var updatedMetrics []*dto.Metric
+	metricsDeleted := 0
+	for _, metric := range metrics {
+		pushJobId := getMetricPushJobId(metric)
+		if pushJobId != nil {
+			if lastPushTimestampSec, ok := a.pushJobsTimestamps[*pushJobId]; ok {
+				if time.Duration(nowTS-lastPushTimestampSec)*time.Second <= ttl {
+					updatedMetrics = append(updatedMetrics, metric)
+				} else {
+					metricsDeleted++
+				}
+			}
+		}
+	}
+
+	return updatedMetrics, metricsDeleted
+}
+
 func (a *aggate) cleanupOldJobsMetrics(ttl time.Duration) {
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
@@ -339,7 +340,7 @@ func (a *aggate) cleanupOldJobsMetrics(ttl time.Duration) {
 		}
 	}
 	cleanupDuration := time.Since(cleanupStartTime)
-	log.Printf("MetricsCleanup - Deleted metrics:%d, remaining metrics:%d, cleanup duration:%d", deletionTotalCount, remainingMetricsCount, cleanupDuration)
+	log.Printf("MetricsCleanup - Deleted metrics:%d, remaining metrics:%d, cleanup duration:%s", deletionTotalCount, remainingMetricsCount, cleanupDuration)
 	for jobId, lastPushTimestampSec := range a.pushJobsTimestamps {
 		// Make sure to delete stale push jobs from the map.
 		jobStaleDuration := time.Duration(nowTS-lastPushTimestampSec) * time.Second
@@ -361,6 +362,7 @@ func main() {
 	pushPath := flag.String("push-path", "/metrics/", "HTTP path to accept pushed metrics.")
 	timeToLive := flag.Duration("ttl", 4*time.Hour, "How long stale metrics will live (default 4h)")
 	cleanupInterval := flag.Duration("cleanup-interval", 1*time.Hour, "How frequently to attempt to cleanup old jobs metrics (default 1h)")
+	flag.Parse()
 
 	a := newAggate(*timeToLive, *cleanupInterval)
 	http.HandleFunc("/metrics", a.handler)
