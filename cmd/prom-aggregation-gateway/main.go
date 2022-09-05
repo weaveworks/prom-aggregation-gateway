@@ -7,7 +7,9 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
+	"time"
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -76,6 +78,10 @@ func mergeBuckets(a, b []*dto.Bucket) []*dto.Bucket {
 		output = append(output, b[j])
 	}
 	return output
+}
+
+func makeTimestampSec() int64 {
+	return time.Now().UnixNano() / int64(time.Second)
 }
 
 func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
@@ -164,14 +170,28 @@ func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 }
 
 type aggate struct {
-	familiesLock sync.RWMutex
-	families     map[string]*dto.MetricFamily
+	timeToLive         time.Duration
+	familiesLock       sync.RWMutex
+	families           map[string]*dto.MetricFamily
+	pushJobsTimestamps map[string]int64
 }
 
-func newAggate() *aggate {
-	return &aggate{
-		families: map[string]*dto.MetricFamily{},
+func newAggate(ttl time.Duration, cleanupInterval time.Duration) *aggate {
+	a := &aggate{timeToLive: ttl,
+		families:           map[string]*dto.MetricFamily{},
+		pushJobsTimestamps: make(map[string]int64),
 	}
+
+	// Start push jobs cleanup ticker marker
+	if cleanupInterval >= 1*time.Second {
+		go func() {
+			for range time.Tick(cleanupInterval) {
+				a.cleanupOldJobsMetrics(ttl)
+			}
+		}()
+	}
+
+	return a
 }
 
 func validateFamily(f *dto.MetricFamily) error {
@@ -196,7 +216,38 @@ func validateFamily(f *dto.MetricFamily) error {
 	return nil
 }
 
-func (a *aggate) parseAndMerge(r io.Reader) error {
+func (a *aggate) cleanupFamily(metrics []*dto.Metric, ttl time.Duration) ([]*dto.Metric, int) {
+	// CurrentTS for old metrics check
+	nowTS := makeTimestampSec()
+
+	// Iterating over metrics and filtering out the old, not recently merged ones
+	var updatedMetrics []*dto.Metric
+	metricsDeleted := 0
+	for _, metric := range metrics {
+		pushJobId := getMetricPushJobId(metric)
+		if pushJobId != nil {
+			if lastPushTimestampSec, ok := a.pushJobsTimestamps[*pushJobId]; ok {
+				if time.Duration(nowTS-lastPushTimestampSec)*time.Second <= ttl {
+					updatedMetrics = append(updatedMetrics, metric)
+				} else {
+					metricsDeleted++
+				}
+			}
+		}
+	}
+
+	return updatedMetrics, metricsDeleted
+}
+
+func getMetricPushJobId(metric *dto.Metric) *string {
+	for _, label := range metric.GetLabel() {
+		if *label.Name == "pushJobId" {
+			return label.Value
+		}
+	}
+	return nil
+}
+func (a *aggate) parseAndMerge(r io.Reader, jobId string) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -205,9 +256,18 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
+	jobLabel := "pushJobId"
+	a.pushJobsTimestamps[jobId] = makeTimestampSec()
+
 	for name, family := range inFamilies {
-		// Sort labels in case source sends them inconsistently
+		// Sort labels in case source sends them inconsistently and add pushJobId label
 		for _, m := range family.Metric {
+			if jobId != "" {
+				labelPair := &dto.LabelPair{Name: &jobLabel,
+					Value: &jobId}
+				m.Label = append(m.Label, labelPair)
+			}
+
 			sort.Sort(byName(m.Label))
 		}
 
@@ -240,9 +300,10 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(w, contentType)
 
-	a.familiesLock.RLock()
-	defer a.familiesLock.RUnlock()
+	a.familiesLock.Lock()
+	defer a.familiesLock.Unlock()
 	metricNames := []string{}
+
 	for name := range a.families {
 		metricNames = append(metricNames, name)
 	}
@@ -254,10 +315,40 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
+	metricNames = nil
 	// TODO reset gauges
 }
 
+func (a *aggate) cleanupOldJobsMetrics(ttl time.Duration) {
+	a.familiesLock.Lock()
+	defer a.familiesLock.Unlock()
+
+	deletionTotalCount := 0
+	remainingMetricsCount := 0
+	cleanupStartTime := time.Now()
+	nowTS := makeTimestampSec()
+	for name := range a.families {
+		deletionCount := 0
+		// Cleaning up metrics which their pushJobId has not been updated for TTL
+		a.families[name].Metric, deletionCount = a.cleanupFamily(a.families[name].GetMetric(), a.timeToLive)
+		deletionTotalCount += deletionCount
+		remainingMetricsCount += len(a.families[name].Metric)
+		// Remove empty family
+		if len(a.families[name].Metric) == 0 {
+			delete(a.families, name)
+		}
+	}
+	cleanupDuration := time.Since(cleanupStartTime)
+	log.Printf("MetricsCleanup - Deleted metrics:%d, remaining metrics:%d, cleanup duration:%d", deletionTotalCount, remainingMetricsCount, cleanupDuration)
+	for jobId, lastPushTimestampSec := range a.pushJobsTimestamps {
+		// Make sure to delete stale push jobs from the map.
+		jobStaleDuration := time.Duration(nowTS-lastPushTimestampSec) * time.Second
+		if jobStaleDuration > (ttl) {
+			log.Printf("MetricsCleanup - Deleted stale pushJobId '%s' from map since nothing has been pushed for %s", jobId, jobStaleDuration)
+			delete(a.pushJobsTimestamps, jobId)
+		}
+	}
+}
 func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
@@ -268,19 +359,30 @@ func main() {
 	listen := flag.String("listen", ":80", "Address and port to listen on.")
 	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
 	pushPath := flag.String("push-path", "/metrics/", "HTTP path to accept pushed metrics.")
-	flag.Parse()
+	timeToLive := flag.Duration("ttl", 4*time.Hour, "How long stale metrics will live (default 4h)")
+	cleanupInterval := flag.Duration("cleanup-interval", 1*time.Hour, "How frequently to attempt to cleanup old jobs metrics (default 1h)")
 
-	a := newAggate()
+	a := newAggate(*timeToLive, *cleanupInterval)
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/-/healthy", handleHealthCheck)
 	http.HandleFunc("/-/ready", handleHealthCheck)
 	http.HandleFunc(*pushPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
-		if err := a.parseAndMerge(r.Body); err != nil {
+		if err := a.parseAndMerge(r.Body, ""); err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	})
+	http.HandleFunc("/metrics/job/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", *cors)
+		jobId := strings.TrimPrefix(r.URL.Path, "/metrics/job/")
+		if err := a.parseAndMerge(r.Body, jobId); err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	})
+
 	log.Fatal(http.ListenAndServe(*listen, nil))
 }

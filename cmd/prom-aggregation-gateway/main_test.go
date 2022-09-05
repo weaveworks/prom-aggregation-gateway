@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pmezard/go-difflib/difflib"
 )
@@ -154,16 +155,16 @@ func TestAggate(t *testing.T) {
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
 	} {
-		a := newAggate()
+		a := newAggate(time.Duration(0), time.Duration(0))
 
-		if err := a.parseAndMerge(strings.NewReader(c.a)); err != nil {
+		if err := a.parseAndMerge(strings.NewReader(c.a), ""); err != nil {
 			if c.err1 == nil {
 				t.Fatalf("Unexpected error: %s", err)
 			} else if c.err1.Error() != err.Error() {
 				t.Fatalf("Expected %s, got %s", c.err1, err)
 			}
 		}
-		if err := a.parseAndMerge(strings.NewReader(c.b)); err != c.err2 {
+		if err := a.parseAndMerge(strings.NewReader(c.b), ""); err != c.err2 {
 			t.Fatalf("Expected %s, got %s", c.err2, err)
 		}
 
