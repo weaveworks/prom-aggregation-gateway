@@ -140,7 +140,7 @@ counter{a="a",b="b"} 3
 `
 )
 
-func TestAggate(t *testing.T) {
+func TestAggregate(t *testing.T) {
 	for _, c := range []struct {
 		a, b string
 		want string
@@ -154,7 +154,7 @@ func TestAggate(t *testing.T) {
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
 	} {
-		a := newAggate()
+		a := newAggregate()
 
 		if err := a.parseAndMerge(strings.NewReader(c.a)); err != nil {
 			if c.err1 == nil {
@@ -181,5 +181,33 @@ func TestAggate(t *testing.T) {
 			})
 			t.Fatal(text)
 		}
+	}
+}
+
+var table = []struct {
+	inputName      string
+	input1, input2 string
+}{
+	{"simpleGauge", gaugeInput, gaugeInput},
+	{"fullMetrics", in1, in2},
+	{"multiLabel", multilabel1, multilabel2},
+	{"labelFields", labelFields1, labelFields2},
+	{"reorderedLabels", reorderedLabels1, reorderedLabels2},
+}
+
+func BenchmarkAggregate(b *testing.B) {
+	for _, v := range table {
+		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
+			for n := 0; n < b.N; n++ {
+				a := newAggregate()
+
+				if err := a.parseAndMerge(strings.NewReader(v.input1)); err != nil {
+					b.Fatalf("unexpected error %s", err)
+				}
+				if err := a.parseAndMerge(strings.NewReader(v.input2)); err != nil {
+					b.Fatalf("unexpected error %s", err)
+				}
+			}
+		})
 	}
 }
