@@ -250,7 +250,7 @@ func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
 
 	for _, name := range metricNames {
 		if err := enc.Encode(a.families[name]); err != nil {
-			http.Error(w, "An error has occurred during metrics encoding:\n\n"+err.Error(), http.StatusInternalServerError)
+			log.Println("An error has occurred during metrics encoding:\n\n" + err.Error())
 			return
 		}
 	}

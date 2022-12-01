@@ -1,0 +1,29 @@
+name: release new version
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['*']
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: checkout the source code
+        uses: actions/checkout@v2
+
+      - name: Extract tag name
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: login to registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the Docker image
+        run: |
+          docker build . --tag ghcr.io/${{ github.repository_owner }}/prom-aggregation-gateway:${{ env.RELEASE_VERSION }}
+          docker push ghcr.io/${{ github.repository_owner }}/prom-aggregation-gateway:${{ env.RELEASE_VERSION }}

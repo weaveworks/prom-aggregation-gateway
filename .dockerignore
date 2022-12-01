@@ -1,0 +1,4 @@
+*
+!go.mod
+!go.sum
+!/cmd/prom-aggregation-gateway/*.go
