@@ -127,7 +127,7 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 
 func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 	if *a.Type != *b.Type {
-		return nil, fmt.Errorf("Cannot merge metric '%s': type %s != %s",
+		return nil, fmt.Errorf("cannot merge metric '%s': type %s != %s",
 			*a.Name, a.Type.String(), b.Type.String())
 	}
 
@@ -163,13 +163,13 @@ func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 	return output, nil
 }
 
-type aggate struct {
+type aggregate struct {
 	familiesLock sync.RWMutex
 	families     map[string]*dto.MetricFamily
 }
 
-func newAggate() *aggate {
-	return &aggate{
+func newAggregate() *aggregate {
+	return &aggregate{
 		families: map[string]*dto.MetricFamily{},
 	}
 }
@@ -196,7 +196,7 @@ func validateFamily(f *dto.MetricFamily) error {
 	return nil
 }
 
-func (a *aggate) parseAndMerge(r io.Reader) error {
+func (a *aggregate) parseAndMerge(r io.Reader) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -235,7 +235,7 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 	return nil
 }
 
-func (a *aggate) handler(w http.ResponseWriter, r *http.Request) {
+func (a *aggregate) handler(w http.ResponseWriter, r *http.Request) {
 	contentType := expfmt.Negotiate(r.Header)
 	w.Header().Set("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(w, contentType)
@@ -270,7 +270,7 @@ func main() {
 	pushPath := flag.String("push-path", "/metrics/", "HTTP path to accept pushed metrics.")
 	flag.Parse()
 
-	a := newAggate()
+	a := newAggregate()
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/-/healthy", handleHealthCheck)
 	http.HandleFunc("/-/ready", handleHealthCheck)
