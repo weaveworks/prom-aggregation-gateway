@@ -1,20 +1,13 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"sort"
-	"sync"
 
 	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 )
 
-func lablesLessThan(a, b []*dto.LabelPair) bool {
+func labelsLessThan(a, b []*dto.LabelPair) bool {
 	i, j := 0, 0
 	for i < len(a) && j < len(b) {
 		if *a[i].Name != *b[j].Name {
@@ -33,7 +26,7 @@ type byLabel []*dto.Metric
 
 func (a byLabel) Len() int           { return len(a) }
 func (a byLabel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byLabel) Less(i, j int) bool { return lablesLessThan(a[i].Label, a[j].Label) }
+func (a byLabel) Less(i, j int) bool { return labelsLessThan(a[i].Label, a[j].Label) }
 
 // Sort a slice of LabelPairs by name
 type byName []*dto.LabelPair
@@ -139,10 +132,10 @@ func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 
 	i, j := 0, 0
 	for i < len(a.Metric) && j < len(b.Metric) {
-		if lablesLessThan(a.Metric[i].Label, b.Metric[j].Label) {
+		if labelsLessThan(a.Metric[i].Label, b.Metric[j].Label) {
 			output.Metric = append(output.Metric, a.Metric[i])
 			i++
-		} else if lablesLessThan(b.Metric[j].Label, a.Metric[i].Label) {
+		} else if labelsLessThan(b.Metric[j].Label, a.Metric[i].Label) {
 			output.Metric = append(output.Metric, b.Metric[j])
 			j++
 		} else {
@@ -163,17 +156,6 @@ func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
 	return output, nil
 }
 
-type aggregate struct {
-	familiesLock sync.RWMutex
-	families     map[string]*dto.MetricFamily
-}
-
-func newAggregate() *aggregate {
-	return &aggregate{
-		families: map[string]*dto.MetricFamily{},
-	}
-}
-
 func validateFamily(f *dto.MetricFamily) error {
 	// Map of fingerprints we've seen before in this family
 	fingerprints := make(map[model.Fingerprint]struct{}, len(f.Metric))
@@ -189,98 +171,9 @@ func validateFamily(f *dto.MetricFamily) error {
 		}
 		fingerprint := lset.Fingerprint()
 		if _, found := fingerprints[fingerprint]; found {
-			return fmt.Errorf("Duplicate labels: %v", lset)
+			return fmt.Errorf("duplicate labels: %v", lset)
 		}
 		fingerprints[fingerprint] = struct{}{}
 	}
 	return nil
-}
-
-func (a *aggregate) parseAndMerge(r io.Reader) error {
-	var parser expfmt.TextParser
-	inFamilies, err := parser.TextToMetricFamilies(r)
-	if err != nil {
-		return err
-	}
-
-	a.familiesLock.Lock()
-	defer a.familiesLock.Unlock()
-	for name, family := range inFamilies {
-		// Sort labels in case source sends them inconsistently
-		for _, m := range family.Metric {
-			sort.Sort(byName(m.Label))
-		}
-
-		if err := validateFamily(family); err != nil {
-			return err
-		}
-
-		// family must be sorted for the merge
-		sort.Sort(byLabel(family.Metric))
-
-		existingFamily, ok := a.families[name]
-		if !ok {
-			a.families[name] = family
-			continue
-		}
-
-		merged, err := mergeFamily(existingFamily, family)
-		if err != nil {
-			return err
-		}
-
-		a.families[name] = merged
-	}
-
-	return nil
-}
-
-func (a *aggregate) handler(w http.ResponseWriter, r *http.Request) {
-	contentType := expfmt.Negotiate(r.Header)
-	w.Header().Set("Content-Type", string(contentType))
-	enc := expfmt.NewEncoder(w, contentType)
-
-	a.familiesLock.RLock()
-	defer a.familiesLock.RUnlock()
-	metricNames := []string{}
-	for name := range a.families {
-		metricNames = append(metricNames, name)
-	}
-	sort.Sort(sort.StringSlice(metricNames))
-
-	for _, name := range metricNames {
-		if err := enc.Encode(a.families[name]); err != nil {
-			log.Println("An error has occurred during metrics encoding:\n\n" + err.Error())
-			return
-		}
-	}
-
-	// TODO reset gauges
-}
-
-func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, `{"alive": true}`)
-}
-
-func main() {
-	listen := flag.String("listen", ":80", "Address and port to listen on.")
-	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
-	pushPath := flag.String("push-path", "/metrics/", "HTTP path to accept pushed metrics.")
-	flag.Parse()
-
-	a := newAggregate()
-	http.HandleFunc("/metrics", a.handler)
-	http.HandleFunc("/-/healthy", handleHealthCheck)
-	http.HandleFunc("/-/ready", handleHealthCheck)
-	http.HandleFunc(*pushPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", *cors)
-		if err := a.parseAndMerge(r.Body); err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	})
-	log.Fatal(http.ListenAndServe(*listen, nil))
 }
