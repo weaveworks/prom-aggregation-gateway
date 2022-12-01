@@ -124,7 +124,7 @@ ui_external_lib_loaded{loaded="true",name="mixpanel"} 2
 ui_external_lib_loaded{name="Munchkin",loaded="true"} 15171
 ui_external_lib_loaded{name="Munchkin",loaded="true"} 1
 `
-	duplicateError = `Duplicate labels: {__name__="ui_external_lib_loaded", loaded="true", name="Munchkin"}`
+	duplicateError = `duplicate labels: {__name__="ui_external_lib_loaded", loaded="true", name="Munchkin"}`
 
 	reorderedLabels1 = `# HELP counter A counter
 # TYPE counter counter
