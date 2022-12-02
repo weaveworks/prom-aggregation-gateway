@@ -8,6 +8,8 @@ controller:
   type: Deployment
 
 service:
+  create: true
+  annotations: {}
   type: LoadBalancer
   port: 8080
   nodePort: 12345

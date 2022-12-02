@@ -1,0 +1,17 @@
+suite: Service tests
+
+templates: [service.yaml]
+
+tests:
+  - it: can render service annotations
+    set:
+      service:
+        annotations:
+          hello: world
+          goodbye: moon
+    asserts:
+      - equal:
+          path: metadata.annotations
+          value:
+            hello: world
+            goodbye: moon

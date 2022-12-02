@@ -2,19 +2,23 @@ apiVersion: apps/v1
 kind: {{ .Values.controller.type }}
 metadata:
   name: {{ .Release.Name }}
+  labels:
+    {{- include "prom-aggregation-gateway.labels" . | nindent 4 }}
+    {{- if .Values.controller.labels }}
+    {{- toYaml .Values.controller.labels | nindent 4 }}
+    {{- end }}
+
 spec:
   selector:
     matchLabels:
-      app: prom-aggregation-gateway
+      {{- include "prom-aggregation-gateway.selectorLabels" . | nindent 6 }}
   {{- if eq .Values.controller.type "Deployment" }}
   replicas: {{ .Values.controller.replicaCount }}
-  {{- else if ne (default .Values.controller.replicaCount 1) 1 }}
-  {{ fail "cannot define replicaCount with Deployment" }}
   {{- end }}
   template:
     metadata:
       labels:
-        app: prom-aggregation-gateway
+        {{- include "prom-aggregation-gateway.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: prom-aggregation-gateway
