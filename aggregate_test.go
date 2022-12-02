@@ -141,6 +141,8 @@ counter{a="a",b="b"} 3
 )
 
 func TestAggregate(t *testing.T) {
+	router := setupRouter(strPtr("*"))
+
 	for _, c := range []struct {
 		a, b string
 		want string
@@ -154,17 +156,17 @@ func TestAggregate(t *testing.T) {
 		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
 	} {
-		a := newAggregate()
-		router := setupRouter(strPtr("*"), a)
+		// create a new aggregate each run
+		Aggregate = newAggregate()
 
-		if err := a.parseAndMerge(strings.NewReader(c.a)); err != nil {
+		if err := Aggregate.parseAndMerge(strings.NewReader(c.a)); err != nil {
 			if c.err1 == nil {
 				t.Fatalf("Unexpected error: %s", err)
 			} else if c.err1.Error() != err.Error() {
 				t.Fatalf("Expected %s, got %s", c.err1, err)
 			}
 		}
-		if err := a.parseAndMerge(strings.NewReader(c.b)); err != c.err2 {
+		if err := Aggregate.parseAndMerge(strings.NewReader(c.b)); err != c.err2 {
 			t.Fatalf("Expected %s, got %s", c.err2, err)
 		}
 

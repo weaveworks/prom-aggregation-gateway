@@ -22,6 +22,12 @@ func newAggregate() *aggregate {
 	}
 }
 
+var Aggregate *aggregate
+
+func init() {
+	Aggregate = newAggregate()
+}
+
 func (a *aggregate) parseAndMerge(r io.Reader) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
@@ -61,21 +67,21 @@ func (a *aggregate) parseAndMerge(r io.Reader) error {
 	return nil
 }
 
-func (a *aggregate) handler(c *gin.Context) {
+func aggregateHandler(c *gin.Context) {
 	contentType := expfmt.Negotiate(c.Request.Header)
 	c.Header("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(c.Writer, contentType)
 
-	a.familiesLock.RLock()
-	defer a.familiesLock.RUnlock()
+	Aggregate.familiesLock.RLock()
+	defer Aggregate.familiesLock.RUnlock()
 	metricNames := []string{}
-	for name := range a.families {
+	for name := range Aggregate.families {
 		metricNames = append(metricNames, name)
 	}
 	sort.Strings(metricNames)
 
 	for _, name := range metricNames {
-		if err := enc.Encode(a.families[name]); err != nil {
+		if err := enc.Encode(Aggregate.families[name]); err != nil {
 			log.Println("An error has occurred during metrics encoding:\n\n" + err.Error())
 			return
 		}
