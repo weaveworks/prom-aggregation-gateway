@@ -72,7 +72,7 @@ func (a *aggregate) handler(w http.ResponseWriter, r *http.Request) {
 	for name := range a.families {
 		metricNames = append(metricNames, name)
 	}
-	sort.Sort(sort.StringSlice(metricNames))
+	sort.Strings(metricNames)
 
 	for _, name := range metricNames {
 		if err := enc.Encode(a.families[name]); err != nil {
