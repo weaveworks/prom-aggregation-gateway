@@ -1,0 +1,3 @@
+# asdf plugin add earthly https://github.com/YR-ZR0/asdf-earthly
+earthly 0.6.30
+golang 1.19.3
