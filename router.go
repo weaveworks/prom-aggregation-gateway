@@ -26,7 +26,7 @@ func strPtr(s string) *string {
 
 func setupRouter(cors *string, aggregate *aggregate) *gin.Engine {
 
-	r := gin.Default()
+	r := gin.New()
 
 	r.GET("/healthy", handleHealthCheck)
 	r.GET("/ready", handleHealthCheck)
