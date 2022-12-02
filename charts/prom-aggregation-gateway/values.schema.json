@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "Deployment",
+            "DaemonSet"
+          ]
+        },
+        "replicaCount": {
+          "type": "integer"
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {"type":  "string"},
+        "port": {"type":  "integer"},
+        "nodePort": {"type":  "integer"}
+      }
+    }
+  }
+}

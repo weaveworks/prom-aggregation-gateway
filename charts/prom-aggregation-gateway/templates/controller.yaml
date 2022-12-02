@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: {{ .Values.controller.type }}
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: prom-aggregation-gateway
+  {{- if eq .Values.controller.type "Deployment" }}
+  replicas: {{ .Values.controller.replicaCount }}
+  {{- else if ne (default .Values.controller.replicaCount 1) 1 }}
+  {{ fail "cannot define replicaCount with Deployment" }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: prom-aggregation-gateway
+    spec:
+      containers:
+        - name: prom-aggregation-gateway
+          image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}
+          args:
+            - --listen=":8080"
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http

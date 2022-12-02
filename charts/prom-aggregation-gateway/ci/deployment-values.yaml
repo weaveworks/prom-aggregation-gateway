@@ -1,0 +1,3 @@
+controller:
+  type: Deployment
+  replicaCount: 2
