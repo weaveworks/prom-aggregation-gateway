@@ -2,30 +2,28 @@ package main
 
 import (
 	"flag"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
-	"github.com/slok/go-http-metrics/middleware/std"
+	mGin "github.com/slok/go-http-metrics/middleware/gin"
 )
 
-func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, `{"alive": true}`)
+func handleHealthCheck(c *gin.Context) {
+	c.Header("Content-Type", "application/json")
+	c.JSON(http.StatusOK, `{"alive": true}`)
 }
 
 func main() {
 	listen := flag.String("listen", ":80", "Address and port to listen on.")
 	metricsListen := flag.String("metricsListen", ":8888", "Address and port serve the metrics endpoint on")
 	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
-	pushPath := flag.String("push-path", "/metrics", "HTTP path to accept pushed metrics.")
 	flag.Parse()
 
 	metricsMiddleware := middleware.New(middleware.Config{
@@ -36,24 +34,26 @@ func main() {
 	signal.Notify(sigChannel, syscall.SIGTERM, syscall.SIGINT)
 
 	a := newAggregate()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/metrics", a.handler)
-	mux.HandleFunc("/healthy", handleHealthCheck)
-	mux.HandleFunc("/ready", handleHealthCheck)
-	mux.HandleFunc(*pushPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", *cors)
-		if err := a.parseAndMerge(r.Body); err != nil {
+	r := gin.Default()
+
+	r.GET("/healthy", handleHealthCheck)
+	r.GET("/ready", handleHealthCheck)
+	r.GET("/metrics", mGin.Handler("metrics", metricsMiddleware), a.handler)
+	r.POST("/metrics/:job", mGin.Handler("/metrics/:job", metricsMiddleware), func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", *cors)
+		// TODO: job work just place holder for now
+		// job := c.Param("job")
+		if err := a.parseAndMerge(c.Request.Body); err != nil {
 			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 			return
 		}
 	})
-	h := std.Handler("", metricsMiddleware, mux)
 
 	// Serve endpoint
 	go func() {
 		log.Printf("server listening at %s", *listen)
-		if err := http.ListenAndServe(*listen, h); err != nil {
+		if err := r.Run(*listen); err != nil {
 			log.Panicf("error while serving: %s", err)
 		}
 	}()

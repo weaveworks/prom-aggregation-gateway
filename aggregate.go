@@ -3,10 +3,10 @@ package main
 import (
 	"io"
 	"log"
-	"net/http"
 	"sort"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
@@ -61,10 +61,10 @@ func (a *aggregate) parseAndMerge(r io.Reader) error {
 	return nil
 }
 
-func (a *aggregate) handler(w http.ResponseWriter, r *http.Request) {
-	contentType := expfmt.Negotiate(r.Header)
-	w.Header().Set("Content-Type", string(contentType))
-	enc := expfmt.NewEncoder(w, contentType)
+func (a *aggregate) handler(c *gin.Context) {
+	contentType := expfmt.Negotiate(c.Request.Header)
+	c.Header("Content-Type", string(contentType))
+	enc := expfmt.NewEncoder(c.Writer, contentType)
 
 	a.familiesLock.RLock()
 	defer a.familiesLock.RUnlock()
