@@ -26,8 +26,10 @@ func main() {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, syscall.SIGTERM, syscall.SIGINT)
 
-	a := newAggregate()
-	r := setupRouter(cors, a)
+	rc := &RouterConfig{
+		AllowedCORS: cors,
+	}
+	r := setupRouter(rc)
 
 	// Serve endpoint
 	go func() {

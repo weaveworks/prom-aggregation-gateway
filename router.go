@@ -10,32 +10,61 @@ import (
 	mGin "github.com/slok/go-http-metrics/middleware/gin"
 )
 
-var (
-	metricsMiddleware middleware.Middleware
-)
+func strPtr(s string) *string {
+	return &s
 
-func init() {
-	metricsMiddleware = middleware.New(middleware.Config{
-		Recorder: metrics.NewRecorder(metrics.Config{}),
+}
+
+type RouterConfig struct {
+	MetricsMiddleware *middleware.Middleware
+	AllowedCORS       *string
+	Aggregate         *aggregate
+}
+
+func (rc *RouterConfig) setupDefault() {
+	if rc.MetricsMiddleware == nil {
+		m := newMetricMiddleware(&metrics.Config{})
+		rc.MetricsMiddleware = &m
+	}
+
+	if rc.AllowedCORS == nil {
+		rc.AllowedCORS = strPtr("*")
+	}
+
+	if rc.Aggregate == nil {
+		rc.Aggregate = newAggregate()
+	}
+}
+
+func DefaultRouterConfig() RouterConfig {
+	rc := RouterConfig{}
+	rc.setupDefault()
+	return rc
+}
+
+func newMetricMiddleware(cfg *metrics.Config) middleware.Middleware {
+	if cfg == nil {
+		cfg = &metrics.Config{}
+	}
+	return middleware.New(middleware.Config{
+		Recorder: metrics.NewRecorder(*cfg),
 	})
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
-func setupRouter(cors *string, aggregate *aggregate) *gin.Engine {
+func setupRouter(cfg *RouterConfig) *gin.Engine {
 
 	r := gin.New()
 
+	cfg.setupDefault()
+
 	r.GET("/healthy", handleHealthCheck)
 	r.GET("/ready", handleHealthCheck)
-	r.GET("/metrics", mGin.Handler("metrics", metricsMiddleware), aggregate.handler)
-	r.POST("/metrics/job/:job", mGin.Handler("/metrics/job/", metricsMiddleware), func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", *cors)
+	r.GET("/metrics", mGin.Handler("metrics", *cfg.MetricsMiddleware), cfg.Aggregate.handler)
+	r.POST("/metrics/job/:job", mGin.Handler("/metrics/job", *cfg.MetricsMiddleware), func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", *cfg.AllowedCORS)
 		// TODO: job work just place holder for now
 		// job := c.Param("job")
-		if err := aggregate.parseAndMerge(c.Request.Body); err != nil {
+		if err := cfg.Aggregate.parseAndMerge(c.Request.Body); err != nil {
 			log.Println(err)
 			http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 			return
