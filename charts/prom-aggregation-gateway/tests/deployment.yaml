@@ -1,0 +1,13 @@
+suite: Deployment controller
+
+templates: [controller.yaml]
+
+tests:
+  - it: should throw an error if we define a replicaCount with a DaemonSet
+    set:
+      controller:
+        type: DaemonSet
+        replicaCount: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: oh noes

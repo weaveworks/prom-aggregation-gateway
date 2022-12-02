@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+  {{- if eq .Values.service.type "NodePort" }}
+      nodePort: {{ .Values.service.nodePort }}
+  {{- else if ne (default .Values.controller.nodePort 12345) 12345 }}
+      {{ fail "cannot define nodePort without a service of type NodePort" }}
+  {{- end }}
+

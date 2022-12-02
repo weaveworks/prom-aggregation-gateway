@@ -1,0 +1,13 @@
+controller:
+  image:
+    repository: ghcr.io/zapier/prom-aggregation-gateway
+    tag: latest
+
+  replicaCount: 1
+
+  type: Deployment
+
+service:
+  type: LoadBalancer
+  port: 8080
+  nodePort: 12345

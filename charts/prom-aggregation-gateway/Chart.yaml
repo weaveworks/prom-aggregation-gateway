@@ -1,0 +1,7 @@
+apiVersion: v2
+name: prom-aggregation-gateway
+version: 0.1.0
+home: https://github.com/zapier/prom-aggregation-gateway
+maintainers:
+  - name: djeebus
+  - name: mplachter

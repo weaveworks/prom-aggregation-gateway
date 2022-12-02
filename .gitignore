@@ -1,4 +1,2 @@
-.pkg
-.uptodate
-prom-aggregation-gateway
-.vscode/
+/prom-aggregation-gateway
+/.vscode
