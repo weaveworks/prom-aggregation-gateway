@@ -155,6 +155,7 @@ func TestAggregate(t *testing.T) {
 		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
 	} {
 		a := newAggregate()
+		router := setupRouter(strPtr("*"), a)
 
 		if err := a.parseAndMerge(strings.NewReader(c.a)); err != nil {
 			if c.err1 == nil {
@@ -167,16 +168,17 @@ func TestAggregate(t *testing.T) {
 			t.Fatalf("Expected %s, got %s", c.err2, err)
 		}
 
-		r := httptest.NewRequest("GET", "http://example.com/foo", nil)
 		w := httptest.NewRecorder()
-		a.handler(w, r)
+		r := httptest.NewRequest("GET", "/metrics", nil)
+
+		router.ServeHTTP(w, r)
 
 		if have := w.Body.String(); have != c.want {
 			text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
 				A:        difflib.SplitLines(c.want),
 				B:        difflib.SplitLines(have),
-				FromFile: "want",
-				ToFile:   "have",
+				FromFile: "have",
+				ToFile:   "want",
 				Context:  3,
 			})
 			t.Fatal(text)
