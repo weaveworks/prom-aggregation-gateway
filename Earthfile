@@ -63,7 +63,18 @@ release-binary:
 
     COPY +build-binary/prom-aggregation-gateway .
 
-    RUN wget https://github.com/cli/cli/releases/download/v${GITHUB_CLI_VERSION}/gh_${GITHUB_CLI_VERSION}_linux_amd64.tar.gz
+    # install github cli
+    RUN FILE=ghcli.tgz \
+        && URL=https://github.com/cli/cli/releases/download/v${GITHUB_CLI_VERSION}/gh_${GITHUB_CLI_VERSION}_linux_amd64.tar.gz \
+        && wget ${URL} \
+            --output-document ${FILE} \
+        && tar \
+            --extract \
+            --verbose \
+            --directory /usr \
+            --strip-components=1 \
+            --file ${FILE} \
+        && gh version
 
     RUN --push gh release create ${version} ./prom-aggregation-gateway
 
