@@ -1,0 +1,21 @@
+name: continuous deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-charts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: earthly/actions-setup@v1
+        with:
+          version: v0.6.30
+
+      - name: checkout the source code
+        uses: actions/checkout@v3
+
+      - name: run continuous deployment actions
+        run: earthly --push +continuous-deploy

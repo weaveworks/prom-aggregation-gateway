@@ -1,0 +1,25 @@
+name: verify pull request
+on: [pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: earthly/actions-setup@v1
+        with:
+          version: v0.6.30
+
+      - uses: actions/checkout@v3
+
+      - run: earthly +test
+
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: earthly/actions-setup@v1
+        with:
+          version: v0.6.30
+
+      - uses: actions/checkout@v3
+
+      - run: earthly +build
