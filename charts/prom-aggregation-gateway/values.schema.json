@@ -30,13 +30,28 @@
         }
       }
     },
+    "nameOverride": {
+      "type": "string"
+    },
     "service": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "type": {"type":  "string"},
-        "port": {"type":  "integer"},
-        "nodePort": {"type":  "integer"}
+        "annotations": {
+          "type": "object"
+        },
+        "create": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "nodePort": {
+          "type": "integer"
+        }
       }
     }
   }

@@ -1,7 +1,11 @@
+{{- if .Values.service.create }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}
+  {{- with .Values.service.annotations }}
+  annotations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,4 +16,4 @@ spec:
   {{- else if ne (default .Values.controller.nodePort 12345) 12345 }}
       {{ fail "cannot define nodePort without a service of type NodePort" }}
   {{- end }}
-
+{{- end }}
