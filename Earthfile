@@ -1,13 +1,46 @@
 VERSION 0.6
 
-ARG IMAGE_TAG="dev"
+ARG version="dev"
+ARG image_name="prom-aggregation-gateway"
 
+ARG ALPINE_VERSION="3.17"
+ARG CHART_RELEASER_VERSION="1.4.1"
+ARG CHART_TESTING_VERSION="3.7.1"
+ARG GITHUB_CLI_VERSION="2.20.2"
 ARG GOLANG_VERSION="1.19.3"
-ARG KUBECONFORM_VERSION="0.5.0"
 ARG HELM_UNITTEST_VERSION="0.2.8"
+ARG KUBECONFORM_VERSION="0.5.0"
+ARG STATICCHECK_VERSION="0.3.3"
+
+test:
+    BUILD +lint-golang
+    BUILD +test-golang
+    BUILD +test-helm
+
+build:
+    BUILD +build-binary
+    BUILD +build-docker
+    BUILD +build-helm
+
+release:
+    BUILD +release-binary
+    BUILD +release-docker
+
+build-docker:
+    FROM alpine:${ALPINE_VERSION}
+    COPY +build-binary/prom-aggregation-gateway .
+    ENTRYPOINT ["/prom-aggregation-gateway"]
+    SAVE IMAGE ${image_name}:${version}
+
+release-docker:
+    FROM +build-docker
+    RUN --push docker push ${image_name}:${version}
+
+continuous-deploy:
+    BUILD +release-helm
 
 go-deps:
-    FROM golang:${GOLANG_VERSION}-alpine3.17
+    FROM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION}
 
     WORKDIR /src
     COPY go.mod go.sum /src
@@ -16,7 +49,7 @@ go-deps:
     SAVE ARTIFACT go.mod AS LOCAL go.mod
     SAVE ARTIFACT go.sum AS LOCAL go.sum
 
-build-bin:
+build-binary:
     FROM +go-deps
 
     WORKDIR /src
@@ -25,29 +58,57 @@ build-bin:
 
     SAVE ARTIFACT ./prom-aggregation-gateway AS LOCAL ./dist/
 
-test-bin:
+release-binary:
+    FROM +build-binary
+
+    COPY +build-binary/prom-aggregation-gateway .
+
+    # install github cli
+    RUN FILE=ghcli.tgz \
+        && URL=https://github.com/cli/cli/releases/download/v${GITHUB_CLI_VERSION}/gh_${GITHUB_CLI_VERSION}_linux_amd64.tar.gz \
+        && wget ${URL} \
+            --output-document ${FILE} \
+        && tar \
+            --extract \
+            --verbose \
+            --directory /usr \
+            --strip-components=1 \
+            --file ${FILE} \
+        && gh version
+
+    RUN --push gh release create ${version} ./prom-aggregation-gateway
+
+lint-golang:
     FROM +go-deps
 
-    WORKDIR /src
+    # install staticcheck
+    RUN FILE=staticcheck.tgz \
+        && URL=https://github.com/dominikh/go-tools/releases/download/v${STATICCHECK_VERSION}/staticcheck_linux_amd64.tar.gz \
+        && wget ${URL} \
+            --output-document ${FILE} \
+        && tar \
+            --extract \
+            --verbose \
+            --directory /bin \
+            --strip-components=1 \
+            --file ${FILE} \
+        && staticcheck -version
+
+    ENV CGO_ENABLED=0
     COPY . /src
+    RUN staticcheck ./...
+
+test-golang:
+    FROM +go-deps
+
+    COPY . /src
+
     ENV CGO_ENABLED=0
     RUN go test .
 
-    WORKDIR /src
-
-build-docker:
-    FROM alpine:3.17
-    COPY +build-bin/prom-aggregation-gateway .
-    ENTRYPOINT ["/prom-aggregation-gateway"]
-    SAVE IMAGE ghcr.io/zapier/prom-aggregation-gateway:${IMAGE_TAG}
-
-golang-test:
-    FROM golang:${GOLANG_VERSION}-alpine3.17
-
-
-helm-test:
+test-helm:
     ARG ct_args=''
-    FROM quay.io/helmpack/chart-testing:v3.7.1
+    FROM quay.io/helmpack/chart-testing:v${CHART_TESTING_VERSION}
 
     # install kubeconform
     RUN FILE=kubeconform.tgz \
@@ -70,17 +131,20 @@ helm-test:
     COPY . /src
     RUN ct --config ./.github/ct.yaml lint ./charts --all
 
-chart-releaser:
-    ARG CHART_RELEASER_VERSION="1.4.1"
+build-helm:
     FROM quay.io/helmpack/chart-releaser:v${CHART_RELEASER_VERSION}
 
     WORKDIR /src
     COPY . /src
-    RUN ls -al
 
     RUN cr --config .github/cr.yaml package charts/*
     SAVE ARTIFACT .cr-release-packages/ AS LOCAL ./dist
+
+release-helm:
+    FROM quay.io/helmpack/chart-releaser:v${CHART_RELEASER_VERSION}
+
+    WORKDIR /src
+    COPY . /src
+
     RUN --push cr --config .github/cr.yaml upload --skip-existing --push
     RUN --push cr --config .github/cr.yaml index
-
-
