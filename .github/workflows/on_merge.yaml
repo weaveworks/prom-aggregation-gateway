@@ -18,6 +18,4 @@ jobs:
         uses: actions/checkout@v3
 
       - name: run continuous deployment actions
-        env:
-          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: earthly --push +continuous-deploy
+        run: earthly --push +continuous-deploy --token ${{ secrets.GITHUB_TOKEN }}
