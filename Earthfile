@@ -24,17 +24,13 @@ build:
 
 release:
     BUILD +release-binary
-    BUILD +release-docker
+    BUILD +build-docker
 
 build-docker:
     FROM alpine:${ALPINE_VERSION}
     COPY +build-binary/prom-aggregation-gateway .
     ENTRYPOINT ["/prom-aggregation-gateway"]
-    SAVE IMAGE ${image_name}:${version}
-
-release-docker:
-    FROM +build-docker
-    RUN --push docker push ${image_name}:${version}
+    SAVE IMAGE --push ${image_name}:${version}
 
 continuous-deploy:
     BUILD +release-helm
@@ -146,5 +142,5 @@ release-helm:
     WORKDIR /src
     COPY . /src
 
-    RUN --push cr --config .github/cr.yaml upload --skip-existing --push
+    RUN --push cr --config .github/cr.yaml upload --skip-existing
     RUN --push cr --config .github/cr.yaml index

@@ -29,6 +29,10 @@ jobs:
 
       - name: Build and push the Docker image
         env:
-          IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/prom-aggregation-gateway:${{ env.RELEASE_VERSION }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          earthly --push +release --version=${{ env.IMAGE_NAME }} --image=ghcr.io/${{ github.repository_owner }}/prom-aggregation-gateway
+          earthly \
+            --push \
+            +release \
+            --version=${{ env.RELEASE_VERSION }} \
+            --image_name=ghcr.io/${{ github.repository_owner }}/prom-aggregation-gateway
