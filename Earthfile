@@ -139,8 +139,16 @@ build-helm:
 release-helm:
     FROM quay.io/helmpack/chart-releaser:v${CHART_RELEASER_VERSION}
 
+    ARG token
+
     WORKDIR /src
     COPY . /src
 
-    RUN --push cr --config .github/cr.yaml upload --skip-existing
-    RUN --push cr --config .github/cr.yaml index
+    RUN cr --config .github/cr.yaml package charts/*
+
+    RUN mkdir -p .cr-index
+    RUN git config --global user.email "opensource@zapier.com"
+    RUN git config --global user.name "Open Source at Zapier"
+
+    RUN --push cr --config .github/cr.yaml upload --token $token --skip-existing
+    RUN --push cr --config .github/cr.yaml index --token $token --push
