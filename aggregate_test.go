@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -212,6 +214,31 @@ func BenchmarkAggregate(b *testing.B) {
 				if err := a.parseAndMerge(strings.NewReader(v.input2)); err != nil {
 					b.Fatalf("unexpected error %s", err)
 				}
+			}
+		})
+	}
+}
+
+func BenchmarkConcurrentAggregate(b *testing.B) {
+	a := newAggregate()
+	for _, v := range table {
+		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
+			if err := a.parseAndMerge(strings.NewReader(v.input1)); err != nil {
+				b.Fatalf("unexpected error %s", err)
+			}
+
+			for n := 0; n < b.N; n++ {
+				g, _ := errgroup.WithContext(context.Background())
+				for tN := 0; tN < 10; tN++ {
+					g.Go(func() error {
+						return a.parseAndMerge(strings.NewReader(v.input2))
+					})
+				}
+
+				if err := g.Wait(); err != nil {
+					b.Fatalf("unexpected error %s", err)
+				}
+
 			}
 		})
 	}
