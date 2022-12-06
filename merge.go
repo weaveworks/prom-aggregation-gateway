@@ -82,7 +82,7 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 		}
 
 	case dto.MetricType_GAUGE:
-		// No very meaninful way for us to merge gauges.  We'll sum them
+		// No very meaningful way for us to merge gauges.  We'll sum them
 		// and clear out any gauges on scrape, as a best approximation, but
 		// this relies on client pushing with the same interval as we scrape.
 		return &dto.Metric{
@@ -118,42 +118,43 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 	return nil
 }
 
-func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
-	if *a.Type != *b.Type {
-		return nil, fmt.Errorf("cannot merge metric '%s': type %s != %s",
-			*a.Name, a.Type.String(), b.Type.String())
+func (mf *metricFamily) mergeFamily(b *dto.MetricFamily) error {
+	if *mf.Type != *b.Type {
+		return fmt.Errorf("cannot merge metric '%s': type %s != %s",
+			*mf.Name, mf.Type.String(), b.Type.String())
 	}
 
-	output := &dto.MetricFamily{
-		Name: a.Name,
-		Help: a.Help,
-		Type: a.Type,
-	}
+	newMetric := []*dto.Metric{}
 
 	i, j := 0, 0
-	for i < len(a.Metric) && j < len(b.Metric) {
-		if labelsLessThan(a.Metric[i].Label, b.Metric[j].Label) {
-			output.Metric = append(output.Metric, a.Metric[i])
+	mf.lock.Lock()
+	defer mf.lock.Unlock()
+	for i < len(mf.Metric) && j < len(b.Metric) {
+		if labelsLessThan(mf.Metric[i].Label, b.Metric[j].Label) {
+			newMetric = append(newMetric, mf.Metric[i])
 			i++
-		} else if labelsLessThan(b.Metric[j].Label, a.Metric[i].Label) {
-			output.Metric = append(output.Metric, b.Metric[j])
+		} else if labelsLessThan(b.Metric[j].Label, mf.Metric[i].Label) {
+			newMetric = append(newMetric, b.Metric[j])
 			j++
 		} else {
-			merged := mergeMetric(*a.Type, a.Metric[i], b.Metric[j])
+			merged := mergeMetric(*mf.Type, mf.Metric[i], b.Metric[j])
 			if merged != nil {
-				output.Metric = append(output.Metric, merged)
+				newMetric = append(newMetric, merged)
 			}
 			i++
 			j++
 		}
 	}
-	for ; i < len(a.Metric); i++ {
-		output.Metric = append(output.Metric, a.Metric[i])
+
+	for ; i < len(mf.Metric); i++ {
+		newMetric = append(newMetric, mf.Metric[i])
 	}
 	for ; j < len(b.Metric); j++ {
-		output.Metric = append(output.Metric, b.Metric[j])
+		newMetric = append(newMetric, b.Metric[j])
 	}
-	return output, nil
+
+	mf.Metric = newMetric
+	return nil
 }
 
 func validateFamily(f *dto.MetricFamily) error {
@@ -161,17 +162,17 @@ func validateFamily(f *dto.MetricFamily) error {
 	fingerprints := make(map[model.Fingerprint]struct{}, len(f.Metric))
 	for _, m := range f.Metric {
 		// Turn protobuf LabelSet into Prometheus model LabelSet
-		lset := make(model.LabelSet, len(m.Label)+1)
+		lSet := make(model.LabelSet, len(m.Label)+1)
 		for _, p := range m.Label {
-			lset[model.LabelName(p.GetName())] = model.LabelValue(p.GetValue())
+			lSet[model.LabelName(p.GetName())] = model.LabelValue(p.GetValue())
 		}
-		lset[model.MetricNameLabel] = model.LabelValue(f.GetName())
-		if err := lset.Validate(); err != nil {
+		lSet[model.MetricNameLabel] = model.LabelValue(f.GetName())
+		if err := lSet.Validate(); err != nil {
 			return err
 		}
-		fingerprint := lset.Fingerprint()
+		fingerprint := lSet.Fingerprint()
 		if _, found := fingerprints[fingerprint]; found {
-			return fmt.Errorf("duplicate labels: %v", lset)
+			return fmt.Errorf("duplicate labels: %v", lSet)
 		}
 		fingerprints[fingerprint] = struct{}{}
 	}
