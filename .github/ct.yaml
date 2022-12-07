@@ -1,5 +1,6 @@
 # See https://github.com/helm/chart-testing#configuration
 remote: origin
+target-branch: main
 helm-extra-args: --kube-version v1.21.0
 additional-commands:
   - "./.github/kubeconform.sh 1.21.0 {{ .Path }}"
