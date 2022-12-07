@@ -149,6 +149,7 @@ release-helm:
     RUN mkdir -p .cr-index
     RUN git config --global user.email "opensource@zapier.com"
     RUN git config --global user.name "Open Source at Zapier"
+    RUN git fetch --prune --unshallow | true
 
     RUN --push cr --config .github/cr.yaml upload --token $token --skip-existing
     RUN --push cr --config .github/cr.yaml index --token $token --push
