@@ -2,6 +2,7 @@ VERSION 0.6
 
 ARG version="dev"
 ARG image_name="prom-aggregation-gateway"
+ARG token=""
 
 ARG ALPINE_VERSION="3.17"
 ARG CHART_RELEASER_VERSION="1.4.1"
@@ -77,6 +78,9 @@ release-binary:
             --file ${FILE} \
         && gh version
 
+    RUN apk add --no-cache git
+    
+    ENV GH_TOKEN $token
     RUN --push gh release create ${version} ./prom-aggregation-gateway
 
 lint-golang:
