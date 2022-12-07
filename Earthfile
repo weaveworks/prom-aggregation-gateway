@@ -130,7 +130,8 @@ test-helm:
     # actually lint the chart
     WORKDIR /src
     COPY . /src
-    RUN ct --config ./.github/ct.yaml lint ./charts --all
+    RUN git fetch --prune --unshallow | true
+    RUN ct --config ./.github/ct.yaml lint ./charts
 
 build-helm:
     FROM quay.io/helmpack/chart-releaser:v${CHART_RELEASER_VERSION}
