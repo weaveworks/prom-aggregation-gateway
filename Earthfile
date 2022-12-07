@@ -13,8 +13,13 @@ ARG KUBECONFORM_VERSION="0.5.0"
 ARG STATICCHECK_VERSION="0.3.3"
 
 test:
+    BUILD +ci-golang
+
+ci-golang:
     BUILD +lint-golang
     BUILD +test-golang
+
+ci-help:
     BUILD +test-helm
 
 build:
