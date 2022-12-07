@@ -11,15 +11,44 @@ import (
 	"github.com/prometheus/common/expfmt"
 )
 
+type metricFamily struct {
+	*dto.MetricFamily
+	lock sync.RWMutex
+}
+
 type aggregate struct {
 	familiesLock sync.RWMutex
-	families     map[string]*dto.MetricFamily
+	families     map[string]*metricFamily
 }
 
 func newAggregate() *aggregate {
 	return &aggregate{
-		families: map[string]*dto.MetricFamily{},
+		families: map[string]*metricFamily{},
 	}
+}
+
+// setFamilyOrGetExistingFamily either sets a new family or returns an existing family
+func (a *aggregate) setFamilyOrGetExistingFamily(familyName string, family *dto.MetricFamily) *metricFamily {
+	a.familiesLock.Lock()
+	defer a.familiesLock.Unlock()
+	existingFamily, ok := a.families[familyName]
+	if !ok {
+		a.families[familyName] = &metricFamily{MetricFamily: family}
+		return nil
+	}
+	return existingFamily
+}
+
+func (a *aggregate) saveFamily(familyName string, family *dto.MetricFamily) error {
+	existingFamily := a.setFamilyOrGetExistingFamily(familyName, family)
+	if existingFamily != nil {
+		err := existingFamily.mergeFamily(family)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (a *aggregate) parseAndMerge(r io.Reader) error {
@@ -29,8 +58,6 @@ func (a *aggregate) parseAndMerge(r io.Reader) error {
 		return err
 	}
 
-	a.familiesLock.Lock()
-	defer a.familiesLock.Unlock()
 	for name, family := range inFamilies {
 		// Sort labels in case source sends them inconsistently
 		for _, m := range family.Metric {
@@ -44,18 +71,10 @@ func (a *aggregate) parseAndMerge(r io.Reader) error {
 		// family must be sorted for the merge
 		sort.Sort(byLabel(family.Metric))
 
-		existingFamily, ok := a.families[name]
-		if !ok {
-			a.families[name] = family
-			continue
-		}
-
-		merged, err := mergeFamily(existingFamily, family)
-		if err != nil {
+		if err := a.saveFamily(name, family); err != nil {
 			return err
 		}
 
-		a.families[name] = merged
 	}
 
 	return nil
@@ -67,16 +86,18 @@ func (a *aggregate) handler(c *gin.Context) {
 	enc := expfmt.NewEncoder(c.Writer, contentType)
 
 	a.familiesLock.RLock()
-	defer a.familiesLock.RUnlock()
 	metricNames := []string{}
 	for name := range a.families {
 		metricNames = append(metricNames, name)
 	}
+	a.familiesLock.RUnlock()
 	sort.Strings(metricNames)
 
 	for _, name := range metricNames {
-		if err := enc.Encode(a.families[name]); err != nil {
-			log.Println("An error has occurred during metrics encoding:\n\n" + err.Error())
+		a.families[name].lock.RLock()
+		defer a.families[name].lock.RUnlock()
+		if err := enc.Encode(a.families[name].MetricFamily); err != nil {
+			log.Printf("An error has occurred during metrics encoding:\n\n%s\n", err.Error())
 			return
 		}
 	}
