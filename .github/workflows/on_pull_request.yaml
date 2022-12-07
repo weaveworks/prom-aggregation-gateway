@@ -1,18 +1,17 @@
-name: verify pull request
-on: [pull_request]
+name: pr_build
+on:
+  pull_request:
+    paths:
+      - '*'
+      - '*/**'
+      - '!README.md'
+      - '!.tool-versions'
+      - '!COPYING.LGPL-3'
+      - '!.gitattributes'
+      - '!..gitignore'
+
 
 jobs:
-  test:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: earthly/actions-setup@v1
-        with:
-          version: v0.6.30
-
-      - uses: actions/checkout@v3
-
-      - run: earthly +test
-
   build:
     runs-on: ubuntu-22.04
     steps:
