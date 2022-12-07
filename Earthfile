@@ -19,7 +19,7 @@ ci-golang:
     BUILD +lint-golang
     BUILD +test-golang
 
-ci-help:
+ci-helm:
     BUILD +test-helm
 
 build:
