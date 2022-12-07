@@ -25,9 +25,12 @@ spec:
           image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}
           args:
             - --listen=":8080"
+            - --metricsListen=":8888"
           ports:
             - name: http
               containerPort: 8080
+            - name: metrics
+              containerPort: 8888
           livenessProbe:
             httpGet:
               path: /-/healthy
