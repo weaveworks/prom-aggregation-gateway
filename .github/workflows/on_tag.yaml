@@ -28,11 +28,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push the Docker image
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           earthly \
             --push \
             +release \
             --version=${{ env.RELEASE_VERSION }} \
-            --image_name=ghcr.io/${{ github.repository_owner }}/prom-aggregation-gateway
+            --image_name=ghcr.io/${{ github.repository_owner }}/prom-aggregation-gateway \
+            --token ${{ secrets.GITHUB_TOKEN }}
