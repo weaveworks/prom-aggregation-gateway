@@ -1,0 +1,21 @@
+suite: Controller tests
+
+templates: [controller.yaml]
+
+tests:
+  - it: can render resources
+    set:
+      controller:
+        resources:
+          requests:
+            cpu: 1
+          limits:
+            cpu: 2
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            requests:
+              cpu: 1
+            limits:
+              cpu: 2
