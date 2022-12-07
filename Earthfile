@@ -130,6 +130,7 @@ test-helm:
     # actually lint the chart
     WORKDIR /src
     COPY . /src
+    RUN git fetch --prune --unshallow | true
     RUN ct --config ./.github/ct.yaml lint ./charts
 
 build-helm:
