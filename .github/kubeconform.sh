@@ -25,7 +25,14 @@ function testFile () {
     file="-f${file}"
   fi
 
-  if ! helm template "${file}" promagg "${dir}" | kubeconform -strict -kubernetes-version "${KUBE_VERSION}" -summary -verbose; then
+  if ! helm template "${file}" promagg "${dir}" \
+    | kubeconform \
+      -strict \
+      -kubernetes-version "${KUBE_VERSION}" \
+      -summary \
+      -verbose \
+      -schema-location default \
+      -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'; then
     return 1
   fi
   return 0
