@@ -1,0 +1,23 @@
+# nonk8s
+apiVersion: skaffold/v4beta1
+kind: Config
+metadata:
+  name: prom-aggregation-gateway
+build:
+  artifacts:
+    - image: ghcr.io/zapier/prom-aggregation-gateway
+      custom:
+        buildCommand: earthly +build-docker --version=dev
+  tagPolicy:
+    customTemplate:
+      template: dev
+manifests:
+  helm:
+    releases:
+      - name: prom-aggregation-gateway
+        chartPath: ./charts/prom-aggregation-gateway
+        createNamespace: true
+        setValues:
+          image.tag: dev
+          podMonitor.create: false
+          serviceMonitor.create: false

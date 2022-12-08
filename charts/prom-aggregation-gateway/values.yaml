@@ -7,9 +7,15 @@ controller:
 
   type: Deployment
 
+podMonitor:
+  create: true
+
 service:
   create: true
   annotations: {}
   type: LoadBalancer
   port: 8080
   nodePort: 12345
+
+serviceMonitor:
+  create: true

@@ -1,3 +1,4 @@
+{{- if .Values.serviceMonitor.create }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -8,3 +9,4 @@ spec:
       {{- include "prom-aggregation-gateway.selectorLabels" . | nindent 6 }}
   endpoints:
   - port: http
+{{- end }}

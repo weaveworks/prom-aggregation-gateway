@@ -24,13 +24,28 @@ ci-helm:
     BUILD +test-helm
 
 build:
-    BUILD +build-binary
     BUILD +build-docker
     BUILD +build-helm
 
 release:
     BUILD +release-binary
     BUILD +build-docker
+
+go-deps:
+    FROM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION}
+
+    WORKDIR /src
+    COPY go.mod go.sum /src
+    RUN go mod download
+
+build-binary:
+    FROM +go-deps
+
+    WORKDIR /src
+    COPY . /src
+    RUN go build -o prom-aggregation-gateway .
+
+    SAVE ARTIFACT ./prom-aggregation-gateway
 
 build-docker:
     FROM alpine:${ALPINE_VERSION}
@@ -41,29 +56,35 @@ build-docker:
 continuous-deploy:
     BUILD +release-helm
 
-go-deps:
-    FROM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION}
+build-binaries:
+    FROM golang:${GOLANG_VERSION}
 
     WORKDIR /src
+
+    RUN go install github.com/mitchellh/gox@latest
+
     COPY go.mod go.sum /src
     RUN go mod download
 
-    SAVE ARTIFACT go.mod AS LOCAL go.mod
-    SAVE ARTIFACT go.sum AS LOCAL go.sum
-
-build-binary:
-    FROM +go-deps
-
-    WORKDIR /src
     COPY . /src
-    RUN go build -o prom-aggregation-gateway .
 
-    SAVE ARTIFACT ./prom-aggregation-gateway AS LOCAL ./dist/
+    RUN \
+        GOFLAGS="-trimpath" \
+        GO111MODULE=on \
+        CGO_ENABLED=0 \
+        gox \
+            -parallel=3 \
+            -ldflags "-X main.version=${version}" \
+            -output="_dist/prom-aggregation-gateway-${version}-{{.OS}}-{{.Arch}}" \
+            -osarch='darwin/amd64 darwin/arm64 linux/amd64 linux/386 linux/arm linux/arm64 linux/ppc64le linux/s390x windows/amd64' \
+            .
 
-release-binary:
-    FROM +build-binary
+    SAVE ARTIFACT _dist AS LOCAL ./dist
 
-    COPY +build-binary/prom-aggregation-gateway .
+release-binaries:
+    FROM alpine:${ALPINE_VERSION}
+
+    COPY +build-binaries/_dist .
 
     # install github cli
     RUN FILE=ghcli.tgz \
@@ -79,9 +100,9 @@ release-binary:
         && gh version
 
     RUN apk add --no-cache git
-    
+
     ENV GH_TOKEN $token
-    RUN --push gh release create ${version} ./prom-aggregation-gateway
+    RUN --push gh release create ${version} ./dist/*
 
 lint-golang:
     FROM +go-deps

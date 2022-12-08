@@ -24,8 +24,10 @@ spec:
         - name: prom-aggregation-gateway
           image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}
           args:
-            - --listen=":8080"
-            - --metricsListen=":8888"
+            - --listen
+            - :8080
+            - --metricsListen
+            - :8888
           ports:
             - name: http
               containerPort: 8080
@@ -33,11 +35,11 @@ spec:
               containerPort: 8888
           livenessProbe:
             httpGet:
-              path: /-/healthy
+              path: /healthy
               port: http
           readinessProbe:
             httpGet:
-              path: /-/ready
+              path: /ready
               port: http
           {{- with .Values.controller.resources }}
           resources: {{ . | toYaml | nindent 12 }}

@@ -1,3 +1,4 @@
+{{- if .Values.podMonitor.create }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -8,3 +9,4 @@ spec:
       {{- include "prom-aggregation-gateway.selectorLabels" . | nindent 6 }}
   podMetricsEndpoints:
   - port: metrics
+{{- end }}
