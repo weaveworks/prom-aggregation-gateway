@@ -83,11 +83,11 @@ histogram_count 2
 
 	multilabel1 = `# HELP counter A counter
 # TYPE counter counter
-counter{a="a",b="b"} 1
+counter{a="a",b="b", ignore_label="ignore_value"} 1
 `
 	multilabel2 = `# HELP counter A counter
 # TYPE counter counter
-counter{a="a",b="b"} 2
+counter{a="a",b="b", ignore_label="ignore_value"} 2
 `
 	multilabelResult = `# HELP counter A counter
 # TYPE counter counter
@@ -140,25 +140,46 @@ counter{b="b",a="a"} 2
 # TYPE counter counter
 counter{a="a",b="b"} 3
 `
+
+	ignoredLabels1 = `# HELP counter A counter
+# TYPE counter counter
+counter{a="a",b="b", ignore_me="ignored"} 1
+`
+	ignoredLabels2 = `# HELP counter A counter
+# TYPE counter counter
+counter{b="b",a="a", ignore_me="ignored"} 2
+`
+	ignoredLabelsResult = `# HELP counter A counter
+# TYPE counter counter
+counter{a="a",b="b"} 3
+`
 )
+
+func TestNewAggregate(t *testing.T) {
+	_ = newAggregate()
+
+}
 
 func TestAggregate(t *testing.T) {
 	metricMiddleware := newMetricMiddleware(nil)
 	for _, c := range []struct {
-		a, b string
-		want string
-		err1 error
-		err2 error
+		a, b          string
+		want          string
+		ignoredLabels []string
+		err1          error
+		err2          error
 	}{
-		{gaugeInput, gaugeInput, gaugeOutput, nil, nil},
-		{in1, in2, want, nil, nil},
-		{multilabel1, multilabel2, multilabelResult, nil, nil},
-		{labelFields1, labelFields2, labelFieldResult, nil, nil},
-		{duplicateLabels, "", "", fmt.Errorf("%s", duplicateError), nil},
-		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, nil, nil},
+		{gaugeInput, gaugeInput, gaugeOutput, []string{}, nil, nil},
+		{in1, in2, want, []string{}, nil, nil},
+		{multilabel1, multilabel2, multilabelResult, []string{"ignore_label"}, nil, nil},
+		{labelFields1, labelFields2, labelFieldResult, []string{}, nil, nil},
+		{duplicateLabels, "", "", []string{}, fmt.Errorf("%s", duplicateError), nil},
+		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, []string{}, nil, nil},
+		{ignoredLabels1, ignoredLabels2, ignoredLabelsResult, []string{"ignore_me"}, nil, nil},
 	} {
 		rc := &RouterConfig{
 			MetricsMiddleware: &metricMiddleware,
+			Aggregate:         newAggregate(AddIgnoredLabels(c.ignoredLabels...)),
 		}
 		router := setupRouter(rc)
 
@@ -191,23 +212,26 @@ func TestAggregate(t *testing.T) {
 	}
 }
 
-var table = []struct {
+var testMetricTable = []struct {
 	inputName      string
 	input1, input2 string
+	ignoredLabels  []string
 }{
-	{"simpleGauge", gaugeInput, gaugeInput},
-	{"fullMetrics", in1, in2},
-	{"multiLabel", multilabel1, multilabel2},
-	{"labelFields", labelFields1, labelFields2},
-	{"reorderedLabels", reorderedLabels1, reorderedLabels2},
+	{"simpleGauge", gaugeInput, gaugeInput, []string{}},
+	{"fullMetrics", in1, in2, []string{}},
+	{"multiLabel", multilabel1, multilabel2, []string{}},
+	{"multiLabelIgnore", multilabel1, multilabel2, []string{"ignore_label"}},
+	{"labelFields", labelFields1, labelFields2, []string{}},
+	{"reorderedLabels", reorderedLabels1, reorderedLabels2, []string{}},
+	{"ignoredLabels", ignoredLabels1, ignoredLabels2, []string{"ignore_me"}},
 }
 
 func BenchmarkAggregate(b *testing.B) {
-	for _, v := range table {
+	a := newAggregate()
+	for _, v := range testMetricTable {
+		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				a := newAggregate()
-
 				if err := a.parseAndMerge(strings.NewReader(v.input1)); err != nil {
 					b.Fatalf("unexpected error %s", err)
 				}
@@ -221,7 +245,8 @@ func BenchmarkAggregate(b *testing.B) {
 
 func BenchmarkConcurrentAggregate(b *testing.B) {
 	a := newAggregate()
-	for _, v := range table {
+	for _, v := range testMetricTable {
+		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
 			if err := a.parseAndMerge(strings.NewReader(v.input1)); err != nil {
 				b.Fatalf("unexpected error %s", err)

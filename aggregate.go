@@ -4,7 +4,9 @@ import (
 	"io"
 	"log"
 	"sort"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	dto "github.com/prometheus/client_model/go"
@@ -19,12 +21,59 @@ type metricFamily struct {
 type aggregate struct {
 	familiesLock sync.RWMutex
 	families     map[string]*metricFamily
+	options      aggregateOptions
 }
 
-func newAggregate() *aggregate {
-	return &aggregate{
-		families: map[string]*metricFamily{},
+type ignoredLabels []string
+
+type aggregateOptions struct {
+	ignoredLabels     ignoredLabels
+	metricTTLDuration *time.Duration
+}
+
+type aggregateOptionsFunc func(a *aggregate)
+
+func AddIgnoredLabels(ignoredLabels ...string) aggregateOptionsFunc {
+	return func(a *aggregate) {
+		a.options.ignoredLabels = ignoredLabels
 	}
+}
+
+func SetTTLMetricTime(duration *time.Duration) aggregateOptionsFunc {
+	return func(a *aggregate) {
+		a.options.metricTTLDuration = duration
+	}
+}
+
+func newAggregate(opts ...aggregateOptionsFunc) *aggregate {
+	a := &aggregate{
+		families: map[string]*metricFamily{},
+		options: aggregateOptions{
+			ignoredLabels: []string{},
+		},
+	}
+
+	for _, opt := range opts {
+		opt(a)
+	}
+
+	a.options.formatOptions()
+
+	return a
+}
+
+func (ao *aggregateOptions) formatOptions() {
+	ao.formatIgnoredLabels()
+}
+
+func (ao *aggregateOptions) formatIgnoredLabels() {
+	if ao.ignoredLabels != nil {
+		for i, v := range ao.ignoredLabels {
+			ao.ignoredLabels[i] = strings.ToLower(v)
+		}
+	}
+
+	sort.Strings(ao.ignoredLabels)
 }
 
 // setFamilyOrGetExistingFamily either sets a new family or returns an existing family
@@ -61,7 +110,7 @@ func (a *aggregate) parseAndMerge(r io.Reader) error {
 	for name, family := range inFamilies {
 		// Sort labels in case source sends them inconsistently
 		for _, m := range family.Metric {
-			sort.Sort(byName(m.Label))
+			a.formatLabels(m)
 		}
 
 		if err := validateFamily(family); err != nil {

@@ -10,11 +10,6 @@ import (
 	mGin "github.com/slok/go-http-metrics/middleware/gin"
 )
 
-func strPtr(s string) *string {
-	return &s
-
-}
-
 type RouterConfig struct {
 	MetricsMiddleware *middleware.Middleware
 	AllowedCORS       *string
