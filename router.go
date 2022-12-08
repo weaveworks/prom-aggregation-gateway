@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -57,9 +58,15 @@ func setupRouter(cfg *RouterConfig) *gin.Engine {
 	r.GET("/metrics", mGin.Handler("metrics", *cfg.MetricsMiddleware), cfg.Aggregate.handler)
 	r.POST("/metrics/job/:job", mGin.Handler("/metrics/job", *cfg.MetricsMiddleware), func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", *cfg.AllowedCORS)
-		// TODO: job work just place holder for now
-		// job := c.Param("job")
-		if err := cfg.Aggregate.parseAndMerge(c.Request.Body); err != nil {
+		job := c.Param("job")
+		// TODO: add logic to verify correct format of job label
+		if job == "" {
+			err := fmt.Errorf("must send in a valid job name, sent: %s", job)
+			log.Println(err)
+			http.Error(c.Writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := cfg.Aggregate.parseAndMerge(c.Request.Body, job); err != nil {
 			log.Println(err)
 			http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 			return
