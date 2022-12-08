@@ -133,7 +133,6 @@ test-golang:
     RUN go test .
 
 test-helm:
-    ARG ct_args=''
     FROM quay.io/helmpack/chart-testing:v${CHART_TESTING_VERSION}
 
     # install kubeconform
