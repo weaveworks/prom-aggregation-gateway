@@ -60,25 +60,25 @@ histogram_count 1
 `
 	want = `# HELP counter A counter
 # TYPE counter counter
-counter 60
+counter{job="test"} 60
 # HELP gauge A gauge
 # TYPE gauge gauge
-gauge 99
+gauge{job="test"} 99
 # HELP histogram A histogram
 # TYPE histogram histogram
-histogram_bucket{le="1"} 0
-histogram_bucket{le="2"} 0
-histogram_bucket{le="3"} 3
-histogram_bucket{le="4"} 8
-histogram_bucket{le="5"} 9
-histogram_bucket{le="6"} 9
-histogram_bucket{le="7"} 9
-histogram_bucket{le="8"} 9
-histogram_bucket{le="9"} 9
-histogram_bucket{le="10"} 9
-histogram_bucket{le="+Inf"} 9
-histogram_sum 7
-histogram_count 2
+histogram_bucket{job="test",le="1"} 0
+histogram_bucket{job="test",le="2"} 0
+histogram_bucket{job="test",le="3"} 3
+histogram_bucket{job="test",le="4"} 8
+histogram_bucket{job="test",le="5"} 9
+histogram_bucket{job="test",le="6"} 9
+histogram_bucket{job="test",le="7"} 9
+histogram_bucket{job="test",le="8"} 9
+histogram_bucket{job="test",le="9"} 9
+histogram_bucket{job="test",le="10"} 9
+histogram_bucket{job="test",le="+Inf"} 9
+histogram_sum{job="test"} 7
+histogram_count{job="test"} 2
 `
 
 	multilabel1 = `# HELP counter A counter
@@ -91,7 +91,7 @@ counter{a="a",b="b", ignore_label="ignore_value"} 2
 `
 	multilabelResult = `# HELP counter A counter
 # TYPE counter counter
-counter{a="a",b="b"} 3
+counter{a="a",b="b",job="test"} 3
 `
 	labelFields1 = `# HELP ui_page_render_errors A counter
 # TYPE ui_page_render_errors counter
@@ -104,8 +104,8 @@ ui_page_render_errors{path="/prom/:orgId"} 1
 `
 	labelFieldResult = `# HELP ui_page_render_errors A counter
 # TYPE ui_page_render_errors counter
-ui_page_render_errors{path="/org/:orgId"} 1
-ui_page_render_errors{path="/prom/:orgId"} 2
+ui_page_render_errors{job="test",path="/org/:orgId"} 1
+ui_page_render_errors{job="test",path="/prom/:orgId"} 2
 `
 	gaugeInput = `
 # HELP ui_external_lib_loaded A gauge with entries in un-sorted order
@@ -116,9 +116,9 @@ ui_external_lib_loaded{name="mixpanel",loaded="true"} 1
 `
 	gaugeOutput = `# HELP ui_external_lib_loaded A gauge with entries in un-sorted order
 # TYPE ui_external_lib_loaded gauge
-ui_external_lib_loaded{loaded="true",name="Intercom"} 2
-ui_external_lib_loaded{loaded="true",name="ga"} 2
-ui_external_lib_loaded{loaded="true",name="mixpanel"} 2
+ui_external_lib_loaded{job="test",loaded="true",name="Intercom"} 2
+ui_external_lib_loaded{job="test",loaded="true",name="ga"} 2
+ui_external_lib_loaded{job="test",loaded="true",name="mixpanel"} 2
 `
 	duplicateLabels = `
 # HELP ui_external_lib_loaded Test with duplicate values
@@ -126,7 +126,7 @@ ui_external_lib_loaded{loaded="true",name="mixpanel"} 2
 ui_external_lib_loaded{name="Munchkin",loaded="true"} 15171
 ui_external_lib_loaded{name="Munchkin",loaded="true"} 1
 `
-	duplicateError = `duplicate labels: {__name__="ui_external_lib_loaded", loaded="true", name="Munchkin"}`
+	duplicateError = `duplicate labels: {__name__="ui_external_lib_loaded", job="test", loaded="true", name="Munchkin"}`
 
 	reorderedLabels1 = `# HELP counter A counter
 # TYPE counter counter
@@ -138,20 +138,20 @@ counter{b="b",a="a"} 2
 `
 	reorderedLabelsResult = `# HELP counter A counter
 # TYPE counter counter
-counter{a="a",b="b"} 3
+counter{a="a",b="b",job="test"} 3
 `
 
 	ignoredLabels1 = `# HELP counter A counter
 # TYPE counter counter
-counter{a="a",b="b", ignore_me="ignored"} 1
+counter{a="a",b="b",ignore_me="ignored"} 1
 `
 	ignoredLabels2 = `# HELP counter A counter
 # TYPE counter counter
-counter{b="b",a="a", ignore_me="ignored"} 2
+counter{b="b",a="a",ignore_me="ignored"} 2
 `
 	ignoredLabelsResult = `# HELP counter A counter
 # TYPE counter counter
-counter{a="a",b="b"} 3
+counter{a="a",b="b",job="test"} 3
 `
 )
 
@@ -163,19 +163,20 @@ func TestNewAggregate(t *testing.T) {
 func TestAggregate(t *testing.T) {
 	metricMiddleware := newMetricMiddleware(nil)
 	for _, c := range []struct {
+		testName      string
 		a, b          string
 		want          string
 		ignoredLabels []string
 		err1          error
 		err2          error
 	}{
-		{gaugeInput, gaugeInput, gaugeOutput, []string{}, nil, nil},
-		{in1, in2, want, []string{}, nil, nil},
-		{multilabel1, multilabel2, multilabelResult, []string{"ignore_label"}, nil, nil},
-		{labelFields1, labelFields2, labelFieldResult, []string{}, nil, nil},
-		{duplicateLabels, "", "", []string{}, fmt.Errorf("%s", duplicateError), nil},
-		{reorderedLabels1, reorderedLabels2, reorderedLabelsResult, []string{}, nil, nil},
-		{ignoredLabels1, ignoredLabels2, ignoredLabelsResult, []string{"ignore_me"}, nil, nil},
+		{"simpleGauge", gaugeInput, gaugeInput, gaugeOutput, []string{}, nil, nil},
+		{"in", in1, in2, want, []string{}, nil, nil},
+		{"multilabel", multilabel1, multilabel2, multilabelResult, []string{"ignore_label"}, nil, nil},
+		{"labelFields", labelFields1, labelFields2, labelFieldResult, []string{}, nil, nil},
+		{"duplicateLabels", duplicateLabels, "", "", []string{}, fmt.Errorf("%s", duplicateError), nil},
+		{"reorderedLabels", reorderedLabels1, reorderedLabels2, reorderedLabelsResult, []string{}, nil, nil},
+		{"ignoredLabels", ignoredLabels1, ignoredLabels2, ignoredLabelsResult, []string{"ignore_me"}, nil, nil},
 	} {
 		rc := &RouterConfig{
 			MetricsMiddleware: &metricMiddleware,
@@ -183,14 +184,14 @@ func TestAggregate(t *testing.T) {
 		}
 		router := setupRouter(rc)
 
-		if err := rc.Aggregate.parseAndMerge(strings.NewReader(c.a)); err != nil {
+		if err := rc.Aggregate.parseAndMerge(strings.NewReader(c.a), "test"); err != nil {
 			if c.err1 == nil {
 				t.Fatalf("Unexpected error: %s", err)
 			} else if c.err1.Error() != err.Error() {
 				t.Fatalf("Expected %s, got %s", c.err1, err)
 			}
 		}
-		if err := rc.Aggregate.parseAndMerge(strings.NewReader(c.b)); err != c.err2 {
+		if err := rc.Aggregate.parseAndMerge(strings.NewReader(c.b), "test"); err != c.err2 {
 			t.Fatalf("Expected %s, got %s", c.err2, err)
 		}
 
@@ -207,7 +208,7 @@ func TestAggregate(t *testing.T) {
 				ToFile:   "want",
 				Context:  3,
 			})
-			t.Fatal(text)
+			t.Fatalf("%s: %s", c.testName, text)
 		}
 	}
 }
@@ -232,10 +233,10 @@ func BenchmarkAggregate(b *testing.B) {
 		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				if err := a.parseAndMerge(strings.NewReader(v.input1)); err != nil {
+				if err := a.parseAndMerge(strings.NewReader(v.input1), "test"); err != nil {
 					b.Fatalf("unexpected error %s", err)
 				}
-				if err := a.parseAndMerge(strings.NewReader(v.input2)); err != nil {
+				if err := a.parseAndMerge(strings.NewReader(v.input2), "test"); err != nil {
 					b.Fatalf("unexpected error %s", err)
 				}
 			}
@@ -248,7 +249,7 @@ func BenchmarkConcurrentAggregate(b *testing.B) {
 	for _, v := range testMetricTable {
 		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
-			if err := a.parseAndMerge(strings.NewReader(v.input1)); err != nil {
+			if err := a.parseAndMerge(strings.NewReader(v.input1), "test"); err != nil {
 				b.Fatalf("unexpected error %s", err)
 			}
 
@@ -256,7 +257,7 @@ func BenchmarkConcurrentAggregate(b *testing.B) {
 				g, _ := errgroup.WithContext(context.Background())
 				for tN := 0; tN < 10; tN++ {
 					g.Go(func() error {
-						return a.parseAndMerge(strings.NewReader(v.input2))
+						return a.parseAndMerge(strings.NewReader(v.input2), "test")
 					})
 				}
 

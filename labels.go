@@ -12,7 +12,22 @@ func strPtr(s string) *string {
 
 }
 
-func (a *aggregate) formatLabels(m *dto.Metric) {
+var JobLabel = strPtr("job")
+
+func addJobLabel(m *dto.Metric, job string) {
+	if len(m.Label) > 0 {
+		for _, l := range m.Label {
+			if l.GetName() == "job" {
+				l.Value = strPtr(job)
+				return
+			}
+		}
+	}
+	m.Label = append(m.Label, &dto.LabelPair{Name: JobLabel, Value: strPtr(job)})
+}
+
+func (a *aggregate) formatLabels(m *dto.Metric, job string) {
+	addJobLabel(m, job)
 	sort.Sort(byName(m.Label))
 
 	if len(a.options.ignoredLabels) > 0 {

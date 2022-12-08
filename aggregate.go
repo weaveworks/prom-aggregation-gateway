@@ -100,7 +100,7 @@ func (a *aggregate) saveFamily(familyName string, family *dto.MetricFamily) erro
 	return nil
 }
 
-func (a *aggregate) parseAndMerge(r io.Reader) error {
+func (a *aggregate) parseAndMerge(r io.Reader, job string) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -110,7 +110,7 @@ func (a *aggregate) parseAndMerge(r io.Reader) error {
 	for name, family := range inFamilies {
 		// Sort labels in case source sends them inconsistently
 		for _, m := range family.Metric {
-			a.formatLabels(m)
+			a.formatLabels(m, job)
 		}
 
 		if err := validateFamily(family); err != nil {

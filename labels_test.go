@@ -20,7 +20,7 @@ func TestFormatLabels(t *testing.T) {
 			{},
 		},
 	}
-	a.formatLabels(m)
+	a.formatLabels(m, "test")
 
 	assert.Equal(t, &dto.LabelPair{Name: strPtr("thing1"), Value: strPtr("value1")}, m.Label[0])
 	assert.Equal(t, &dto.LabelPair{Name: strPtr("thing2"), Value: strPtr("value2")}, m.Label[1])
@@ -83,7 +83,7 @@ func BenchmarkFormatLabels(b *testing.B) {
 		a := newAggregate(AddIgnoredLabels(v.ignoredLabels...))
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				a.formatLabels(v.m)
+				a.formatLabels(v.m, "test")
 			}
 		})
 	}
