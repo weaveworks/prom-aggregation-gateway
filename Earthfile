@@ -28,7 +28,7 @@ build:
     BUILD +build-helm
 
 release:
-    BUILD +release-binary
+    BUILD +release-binaries
     BUILD +build-docker
 
 go-deps:
