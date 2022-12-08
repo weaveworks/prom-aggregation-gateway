@@ -16,9 +16,20 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: earthly/actions-setup@v1
-        with:
-          version: v0.6.30
+        with: { version: v0.6.30 }
 
       - uses: actions/checkout@v3
 
       - run: earthly +build
+
+  release-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: earthly/actions-setup@v1
+        with: { version: v0.6.30 }
+
+      - uses: actions/checkout@v3
+
+      # intentionally avoiding --push, this is just
+      # to test the command
+      - run: earthly +release
