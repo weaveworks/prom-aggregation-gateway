@@ -2,8 +2,8 @@ name: release new version
 
 on:
   workflow_dispatch:
-  push:
-    tags: ['*']
+  release:
+    types: [published]
 
 jobs:
   release:
