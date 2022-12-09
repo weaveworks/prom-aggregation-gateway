@@ -104,7 +104,7 @@ release-binaries:
     RUN apk add --no-cache git
 
     ENV GH_TOKEN $token
-    RUN --push gh release create ${version} ./dist/*
+    RUN --push gh release upload ${version} ./dist/*
 
 lint-golang:
     FROM +go-deps
