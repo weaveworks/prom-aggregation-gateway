@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -129,7 +131,7 @@ func (a *aggregate) parseAndMerge(r io.Reader, job string) error {
 	return nil
 }
 
-func (a *aggregate) handler(c *gin.Context) {
+func (a *aggregate) handleRender(c *gin.Context) {
 	contentType := expfmt.Negotiate(c.Request.Header)
 	c.Header("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(c.Writer, contentType)
@@ -152,4 +154,21 @@ func (a *aggregate) handler(c *gin.Context) {
 	}
 
 	// TODO reset gauges
+}
+
+func (a *aggregate) handleInsert(c *gin.Context) {
+	job := c.Param("job")
+	// TODO: add logic to verify correct format of job label
+	if job == "" {
+		err := fmt.Errorf("must send in a valid job name, sent: %s", job)
+		log.Println(err)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := a.parseAndMerge(c.Request.Body, job); err != nil {
+		log.Println(err)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
+		return
+	}
 }

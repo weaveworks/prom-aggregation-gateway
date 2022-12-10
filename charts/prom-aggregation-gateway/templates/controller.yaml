@@ -23,24 +23,33 @@ spec:
       containers:
         - name: prom-aggregation-gateway
           image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}
+          {{- with .Values.controller.env }}
+          env:
+          {{- range $key, $value := . }}
+          {{- if not (kindIs "invalid" $value) }}
+            - name: "{{ $key }}"
+              value: "{{ $value }}"
+          {{- end }}
+          {{- end }}
+          {{- end }}
           args:
             - --listen
-            - :8080
+            - :{{ .Values.controller.apiPort }}
             - --metricsListen
-            - :8888
+            - :{{ .Values.controller.lifecyclePort }}
           ports:
-            - name: http
-              containerPort: 8080
-            - name: metrics
-              containerPort: 8888
+            - name: apiPort
+              containerPort: {{ .Values.controller.apiPort }}
+            - name: lifecycle
+              containerPort: {{ .Values.controller.lifecyclePort }}
           livenessProbe:
             httpGet:
               path: /healthy
-              port: http
+              port: lifecycle
           readinessProbe:
             httpGet:
               path: /ready
-              port: http
+              port: lifecycle
           {{- with .Values.controller.resources }}
           resources: {{ . | toYaml | nindent 12 }}
           {{- end }}

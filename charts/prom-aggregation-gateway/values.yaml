@@ -3,9 +3,15 @@ controller:
     repository: ghcr.io/zapier/prom-aggregation-gateway
     tag: latest
 
+  apiPort: 8080
+  lifecyclePort: 8888
+
   replicaCount: 1
 
   type: Deployment
+
+  env:
+    GIN_MODE: release
 
 podMonitor:
   create: true

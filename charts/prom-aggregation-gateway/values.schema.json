@@ -13,6 +13,12 @@
             "DaemonSet"
           ]
         },
+        "env": {
+          "type": "object",
+          "patternProperties": {
+            ".*": {"type":  ["string", "null"]}
+          }
+        },
         "replicaCount": {
           "type": "integer"
         },
@@ -30,8 +36,18 @@
         },
         "resources": {
           "type": "object"
+        },
+        "lifecyclePort": {
+          "type": "integer"
+        },
+        "apiPort": {
+          "type": "integer"
         }
-      }
+      },
+      "required": [
+        "lifecyclePort",
+        "apiPort"
+      ]
     },
     "nameOverride": {
       "type": "string"
