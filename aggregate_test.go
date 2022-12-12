@@ -172,7 +172,7 @@ func TestAggregate(t *testing.T) {
 	} {
 		t.Run(c.testName, func(t *testing.T) {
 			agg := newAggregate(AddIgnoredLabels(c.ignoredLabels...))
-			router := setupAPIRouter(nil, agg)
+			router := setupAPIRouter("*", agg)
 
 			err := agg.parseAndMerge(strings.NewReader(c.a), "test")
 			require.NoError(t, err)

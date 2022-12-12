@@ -9,10 +9,10 @@ import (
 	mGin "github.com/slok/go-http-metrics/middleware/gin"
 )
 
-func setupAPIRouter(corsDomain *string, agg *aggregate) *gin.Engine {
+func setupAPIRouter(corsDomain string, agg *aggregate) *gin.Engine {
 	corsConfig := cors.Config{}
-	if corsDomain != nil {
-		corsConfig.AllowOrigins = []string{*corsDomain}
+	if corsDomain != "*" {
+		corsConfig.AllowOrigins = []string{corsDomain}
 	} else {
 		corsConfig.AllowAllOrigins = true
 	}
