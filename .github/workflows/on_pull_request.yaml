@@ -15,32 +15,38 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: earthly/actions-setup@v1
-        with: { version: v0.6.30 }
-
       - uses: actions/checkout@v3
 
-      - run: earthly +build
+      - uses: wistia/parse-tool-versions@v1.0
+
+      - uses: earthly/actions-setup@v1
+        with: { version: "v${{ env.EARTHLY_TOOL_VERSION }}" }
+
+      - run: earthly +build --GOLANG_VERSION=${{ env.GOLANG_TOOL_VERSION }}
 
   release-test:
     runs-on: ubuntu-22.04
     steps:
-      - uses: earthly/actions-setup@v1
-        with: { version: v0.6.30 }
-
       - uses: actions/checkout@v3
+
+      - uses: wistia/parse-tool-versions@v1.0
+
+      - uses: earthly/actions-setup@v1
+        with: { version: "v${{ env.EARTHLY_TOOL_VERSION }}" }
 
       # intentionally avoiding --push, this is just
       # to test the command
-      - run: earthly +release
+      - run: earthly +release --GOLANG_VERSION=${{ env.GOLANG_TOOL_VERSION }}
 
   skaffold:
     runs-on: ubuntu-22.04
     steps:
-      - uses: earthly/actions-setup@v1
-        with: { version: v0.6.30 }
-
       - uses: actions/checkout@v3
+
+      - uses: wistia/parse-tool-versions@v1.0
+
+      - uses: earthly/actions-setup@v1
+        with: { version: "v${{ env.EARTHLY_TOOL_VERSION }}" }
 
       - name: start minikube
         uses: hiberbee/github-action-minikube@1.7.0
@@ -51,5 +57,5 @@ jobs:
       - name: run skaffold
         uses: hiberbee/github-action-skaffold@1.24.0
         with:
-          skaffold-version: 2.0.3
+          skaffold-version: "${{ env.SKAFFOLD_TOOL_VERSION }}"
           command: run
