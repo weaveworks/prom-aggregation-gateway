@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -155,62 +156,54 @@ counter{a="a",b="b",job="test"} 3
 `
 )
 
-func TestNewAggregate(t *testing.T) {
-	_ = newAggregate()
-
-}
-
 func TestAggregate(t *testing.T) {
-	metricMiddleware := newMetricMiddleware(nil)
 	for _, c := range []struct {
 		testName      string
 		a, b          string
 		want          string
 		ignoredLabels []string
-		err1          error
-		err2          error
 	}{
-		{"simpleGauge", gaugeInput, gaugeInput, gaugeOutput, []string{}, nil, nil},
-		{"in", in1, in2, want, []string{}, nil, nil},
-		{"multilabel", multilabel1, multilabel2, multilabelResult, []string{"ignore_label"}, nil, nil},
-		{"labelFields", labelFields1, labelFields2, labelFieldResult, []string{}, nil, nil},
-		{"duplicateLabels", duplicateLabels, "", "", []string{}, fmt.Errorf("%s", duplicateError), nil},
-		{"reorderedLabels", reorderedLabels1, reorderedLabels2, reorderedLabelsResult, []string{}, nil, nil},
-		{"ignoredLabels", ignoredLabels1, ignoredLabels2, ignoredLabelsResult, []string{"ignore_me"}, nil, nil},
+		{"simpleGauge", gaugeInput, gaugeInput, gaugeOutput, []string{}},
+		{"in", in1, in2, want, []string{}},
+		{"multilabel", multilabel1, multilabel2, multilabelResult, []string{"ignore_label"}},
+		{"labelFields", labelFields1, labelFields2, labelFieldResult, []string{}},
+		{"reorderedLabels", reorderedLabels1, reorderedLabels2, reorderedLabelsResult, []string{}},
+		{"ignoredLabels", ignoredLabels1, ignoredLabels2, ignoredLabelsResult, []string{"ignore_me"}},
 	} {
-		rc := &RouterConfig{
-			MetricsMiddleware: &metricMiddleware,
-			Aggregate:         newAggregate(AddIgnoredLabels(c.ignoredLabels...)),
-		}
-		router := setupRouter(rc)
+		t.Run(c.testName, func(t *testing.T) {
+			agg := newAggregate(AddIgnoredLabels(c.ignoredLabels...))
+			router := setupAPIRouter("*", agg)
 
-		if err := rc.Aggregate.parseAndMerge(strings.NewReader(c.a), "test"); err != nil {
-			if c.err1 == nil {
-				t.Fatalf("Unexpected error: %s", err)
-			} else if c.err1.Error() != err.Error() {
-				t.Fatalf("Expected %s, got %s", c.err1, err)
+			err := agg.parseAndMerge(strings.NewReader(c.a), "test")
+			require.NoError(t, err)
+
+			err = agg.parseAndMerge(strings.NewReader(c.b), "test")
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/metrics", nil)
+
+			router.ServeHTTP(w, r)
+
+			if have := w.Body.String(); have != c.want {
+				text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+					A:        difflib.SplitLines(c.want),
+					B:        difflib.SplitLines(have),
+					FromFile: "have",
+					ToFile:   "want",
+					Context:  3,
+				})
+				t.Fatalf("%s: %s", c.testName, text)
 			}
-		}
-		if err := rc.Aggregate.parseAndMerge(strings.NewReader(c.b), "test"); err != c.err2 {
-			t.Fatalf("Expected %s, got %s", c.err2, err)
-		}
-
-		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/metrics", nil)
-
-		router.ServeHTTP(w, r)
-
-		if have := w.Body.String(); have != c.want {
-			text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
-				A:        difflib.SplitLines(c.want),
-				B:        difflib.SplitLines(have),
-				FromFile: "have",
-				ToFile:   "want",
-				Context:  3,
-			})
-			t.Fatalf("%s: %s", c.testName, text)
-		}
+		})
 	}
+
+	t.Run("duplicateLabels", func(t *testing.T) {
+		agg := newAggregate()
+
+		err := agg.parseAndMerge(strings.NewReader(duplicateLabels), "test")
+		require.Equal(t, err.Error(), duplicateError)
+	})
 }
 
 var testMetricTable = []struct {

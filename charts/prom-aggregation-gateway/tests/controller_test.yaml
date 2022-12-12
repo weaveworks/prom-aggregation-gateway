@@ -19,3 +19,22 @@ tests:
               cpu: 1
             limits:
               cpu: 2
+  - it: can render env vars
+    set:
+      controller:
+        env:
+          hello: world
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - {name: GIN_MODE, value: release}
+            - {name: hello, value: world}
+  - it: can remove default env var
+    set:
+      controller:
+        env:
+          GIN_MODE:
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].env

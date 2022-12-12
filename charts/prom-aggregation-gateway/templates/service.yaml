@@ -13,9 +13,9 @@ spec:
   selector:
     {{- include "prom-aggregation-gateway.selectorLabels" . | nindent 4 }}
   ports:
-    - name: http
+    - name: apiPort
       port: {{ .Values.service.port }}
-      targetPort: http
+      targetPort: apiPort
   {{- if eq .Values.service.type "NodePort" }}
       nodePort: {{ .Values.service.nodePort }}
   {{- else if ne (default .Values.controller.nodePort 12345) 12345 }}

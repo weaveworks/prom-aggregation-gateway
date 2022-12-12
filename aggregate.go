@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -129,27 +131,53 @@ func (a *aggregate) parseAndMerge(r io.Reader, job string) error {
 	return nil
 }
 
-func (a *aggregate) handler(c *gin.Context) {
+func (a *aggregate) handleRender(c *gin.Context) {
 	contentType := expfmt.Negotiate(c.Request.Header)
 	c.Header("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(c.Writer, contentType)
 
 	a.familiesLock.RLock()
+	defer a.familiesLock.RUnlock()
+
 	metricNames := []string{}
 	for name := range a.families {
 		metricNames = append(metricNames, name)
 	}
-	a.familiesLock.RUnlock()
 	sort.Strings(metricNames)
 
 	for _, name := range metricNames {
-		a.families[name].lock.RLock()
-		defer a.families[name].lock.RUnlock()
-		if err := enc.Encode(a.families[name].MetricFamily); err != nil {
-			log.Printf("An error has occurred during metrics encoding:\n\n%s\n", err.Error())
+		if a.encodeMetric(name, enc) {
 			return
 		}
 	}
 
 	// TODO reset gauges
+}
+
+func (a *aggregate) encodeMetric(name string, enc expfmt.Encoder) bool {
+	a.families[name].lock.RLock()
+	defer a.families[name].lock.RUnlock()
+
+	if err := enc.Encode(a.families[name].MetricFamily); err != nil {
+		log.Printf("An error has occurred during metrics encoding:\n\n%s\n", err.Error())
+		return true
+	}
+	return false
+}
+
+func (a *aggregate) handleInsert(c *gin.Context) {
+	job := c.Param("job")
+	// TODO: add logic to verify correct format of job label
+	if job == "" {
+		err := fmt.Errorf("must send in a valid job name, sent: %s", job)
+		log.Println(err)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := a.parseAndMerge(c.Request.Body, job); err != nil {
+		log.Println(err)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
+		return
+	}
 }

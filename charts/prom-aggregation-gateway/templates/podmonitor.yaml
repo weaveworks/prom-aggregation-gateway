@@ -8,5 +8,5 @@ spec:
     matchLabels:
       {{- include "prom-aggregation-gateway.selectorLabels" . | nindent 6 }}
   podMetricsEndpoints:
-  - port: metrics
+  - port: lifecycle
 {{- end }}
