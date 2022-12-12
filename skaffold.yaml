@@ -7,7 +7,7 @@ build:
   artifacts:
     - image: ghcr.io/zapier/prom-aggregation-gateway
       custom:
-        buildCommand: earthly +build-docker --version=dev
+        buildCommand: earthly +build-docker --version=dev --image_name=ghcr.io/zapier/prom-aggregation-gateway
   tagPolicy:
     customTemplate:
       template: dev

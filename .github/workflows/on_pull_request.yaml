@@ -8,7 +8,7 @@ on:
       - '!.tool-versions'
       - '!COPYING.LGPL-3'
       - '!.gitattributes'
-      - '!..gitignore'
+      - '!.gitignore'
 
 
 jobs:
@@ -33,3 +33,23 @@ jobs:
       # intentionally avoiding --push, this is just
       # to test the command
       - run: earthly +release
+
+  skaffold:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: earthly/actions-setup@v1
+        with: { version: v0.6.30 }
+
+      - uses: actions/checkout@v3
+
+      - name: start minikube
+        uses: hiberbee/github-action-minikube@1.7.0
+
+      - name: setup helm
+        uses: hiberbee/github-action-helm@1.13.0
+
+      - name: run skaffold
+        uses: hiberbee/github-action-skaffold@1.24.0
+        with:
+          skaffold-version: 2.0.3
+          command: run

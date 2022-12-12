@@ -8,5 +8,5 @@ spec:
     matchLabels:
       {{- include "prom-aggregation-gateway.selectorLabels" . | nindent 6 }}
   endpoints:
-  - port: apiPort
+  - port: api-port
 {{- end }}

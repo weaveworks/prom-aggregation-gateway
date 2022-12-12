@@ -33,12 +33,12 @@ spec:
           {{- end }}
           {{- end }}
           args:
-            - --listen
+            - --apiListen
             - :{{ .Values.controller.apiPort }}
-            - --metricsListen
+            - --lifecycleListen
             - :{{ .Values.controller.lifecyclePort }}
           ports:
-            - name: apiPort
+            - name: api-port
               containerPort: {{ .Values.controller.apiPort }}
             - name: lifecycle
               containerPort: {{ .Values.controller.lifecyclePort }}
