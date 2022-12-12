@@ -137,23 +137,32 @@ func (a *aggregate) handleRender(c *gin.Context) {
 	enc := expfmt.NewEncoder(c.Writer, contentType)
 
 	a.familiesLock.RLock()
+	defer a.familiesLock.RUnlock()
+
 	metricNames := []string{}
 	for name := range a.families {
 		metricNames = append(metricNames, name)
 	}
-	a.familiesLock.RUnlock()
 	sort.Strings(metricNames)
 
 	for _, name := range metricNames {
-		a.families[name].lock.RLock()
-		defer a.families[name].lock.RUnlock()
-		if err := enc.Encode(a.families[name].MetricFamily); err != nil {
-			log.Printf("An error has occurred during metrics encoding:\n\n%s\n", err.Error())
+		if a.encodeMetric(name, enc) {
 			return
 		}
 	}
 
 	// TODO reset gauges
+}
+
+func (a *aggregate) encodeMetric(name string, enc expfmt.Encoder) bool {
+	a.families[name].lock.RLock()
+	defer a.families[name].lock.RUnlock()
+
+	if err := enc.Encode(a.families[name].MetricFamily); err != nil {
+		log.Printf("An error has occurred during metrics encoding:\n\n%s\n", err.Error())
+		return true
+	}
+	return false
 }
 
 func (a *aggregate) handleInsert(c *gin.Context) {
