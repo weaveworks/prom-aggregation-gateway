@@ -11,14 +11,13 @@ graph TD
     build-binary --> build-docker
     release-binary --> release
     release-binary -.create release.-> github
-    release-docker --> release
-    release-docker -.push package.-> github
+    build-docker --> release
+    build-docker -.push package.-> github
     
     build-binary --> release-binary
-    build-docker --> release-docker
-    
-    release-helm --> continuous-deploy
-    release-helm -.push to gh-pages.-> github
+
+    build-helm --> continuous-deploy
+    build-helm -.push to gh-pages.-> github
     
     go-deps --> build-binary
     go-deps --> lint-golang
