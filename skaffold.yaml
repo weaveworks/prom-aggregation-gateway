@@ -18,6 +18,7 @@ manifests:
         chartPath: ./charts/prom-aggregation-gateway
         createNamespace: true
         setValues:
-          image.tag: dev
+          controller.image.repository: prom-aggregation-gateway
+          controller.image.tag: dev
           podMonitor.create: false
           serviceMonitor.create: false

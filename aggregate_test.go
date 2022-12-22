@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/prometheus/client_golang/prometheus"
+	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -172,7 +174,7 @@ func TestAggregate(t *testing.T) {
 	} {
 		t.Run(c.testName, func(t *testing.T) {
 			agg := newAggregate(AddIgnoredLabels(c.ignoredLabels...))
-			router := setupAPIRouter("*", agg)
+			router := setupAPIRouter("*", agg, metrics.Config{ Registry: prometheus.NewRegistry()})
 
 			err := agg.parseAndMerge(strings.NewReader(c.a), "test")
 			require.NoError(t, err)

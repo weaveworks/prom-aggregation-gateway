@@ -4,15 +4,21 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func setupLifecycleRouter() *gin.Engine {
+func setupLifecycleRouter(promRegistry *prometheus.Registry) *gin.Engine {
 	r := gin.New()
+
+	metricsHandler := promhttp.InstrumentMetricHandler(
+		promRegistry,
+		promhttp.HandlerFor(promRegistry, promhttp.HandlerOpts{}),
+	)
 
 	r.GET("/healthy", handleHealthCheck)
 	r.GET("/ready", handleHealthCheck)
-	r.GET("/metrics", convertHandler(promhttp.Handler()))
+	r.GET("/metrics", convertHandler(metricsHandler))
 
 	return r
 }

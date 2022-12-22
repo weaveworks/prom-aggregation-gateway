@@ -50,6 +50,7 @@ build-binary:
 build-docker:
     FROM alpine:${ALPINE_VERSION}
     COPY +build-binary/prom-aggregation-gateway .
+    ENV GIN_MODE=release
     ENTRYPOINT ["/prom-aggregation-gateway"]
     SAVE IMAGE --push ${image_name}:${version}
 
