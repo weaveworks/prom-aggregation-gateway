@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 )
 
@@ -41,7 +40,6 @@ func runServers(corsDomain string, apiListen string, lifecycleListen string) {
 
 	agg := newAggregate()
 
-	promRegistry := prometheus.NewRegistry()
 	promMetricsConfig := metrics.Config{
 		Registry: promRegistry,
 	}

@@ -78,6 +78,13 @@ func (ao *aggregateOptions) formatIgnoredLabels() {
 	sort.Strings(ao.ignoredLabels)
 }
 
+func (a *aggregate) Len() int {
+	a.familiesLock.RLock()
+	count := len(a.families)
+	a.familiesLock.RUnlock()
+	return count
+}
+
 // setFamilyOrGetExistingFamily either sets a new family or returns an existing family
 func (a *aggregate) setFamilyOrGetExistingFamily(familyName string, family *dto.MetricFamily) *metricFamily {
 	a.familiesLock.Lock()
@@ -126,7 +133,11 @@ func (a *aggregate) parseAndMerge(r io.Reader, job string) error {
 			return err
 		}
 
+		MetricCountByFamily.WithLabelValues(name).Set(float64(len(family.Metric)))
+
 	}
+
+	TotalFamiliesGauge.Set(float64(a.Len()))
 
 	return nil
 }
@@ -140,15 +151,29 @@ func (a *aggregate) handleRender(c *gin.Context) {
 	defer a.familiesLock.RUnlock()
 
 	metricNames := []string{}
-	for name := range a.families {
+	metricTypeCounts := make(map[string]int)
+	for name, family := range a.families {
 		metricNames = append(metricNames, name)
+		var typeName string
+		if family.Type == nil {
+			typeName = "unknown"
+		} else {
+			typeName = dto.MetricType_name[int32(*family.Type)]
+		}
+		metricTypeCounts[typeName]++
 	}
+
 	sort.Strings(metricNames)
 
 	for _, name := range metricNames {
 		if a.encodeMetric(name, enc) {
 			return
 		}
+	}
+
+	MetricCountByType.Reset()
+	for typeName, count := range metricTypeCounts {
+		MetricCountByType.WithLabelValues(typeName).Set(float64(count))
 	}
 
 	// TODO reset gauges
@@ -180,4 +205,6 @@ func (a *aggregate) handleInsert(c *gin.Context) {
 		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	MetricPushes.WithLabelValues(job).Inc()
 }
