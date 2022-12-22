@@ -3,13 +3,12 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
 	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	mGin "github.com/slok/go-http-metrics/middleware/gin"
 )
 
-func setupAPIRouter(corsDomain string, agg *aggregate) *gin.Engine {
+func setupAPIRouter(corsDomain string, agg *aggregate, promConfig metrics.Config) *gin.Engine {
 	corsConfig := cors.Config{}
 	if corsDomain != "*" {
 		corsConfig.AllowOrigins = []string{corsDomain}
@@ -17,10 +16,8 @@ func setupAPIRouter(corsDomain string, agg *aggregate) *gin.Engine {
 		corsConfig.AllowAllOrigins = true
 	}
 
-	cfg := new(metrics.Config)
-	cfg.Registry = prometheus.NewRegistry()
 	metricsMiddleware := middleware.New(middleware.Config{
-		Recorder: metrics.NewRecorder(*cfg),
+		Recorder: metrics.NewRecorder(promConfig),
 	})
 
 	r := gin.New()

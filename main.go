@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
+	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
 )
 
 var (
@@ -39,10 +40,14 @@ func runServers(corsDomain string, apiListen string, lifecycleListen string) {
 
 	agg := newAggregate()
 
-	apiRouter := setupAPIRouter(corsDomain, agg)
+	promMetricsConfig := metrics.Config{
+		Registry: promRegistry,
+	}
+
+	apiRouter := setupAPIRouter(corsDomain, agg, promMetricsConfig)
 	go runServer("api", apiRouter, apiListen)
 
-	lifecycleRouter := setupLifecycleRouter()
+	lifecycleRouter := setupLifecycleRouter(promRegistry)
 	go runServer("lifecycle", lifecycleRouter, lifecycleListen)
 
 	// Block until an interrupt or term signal is sent

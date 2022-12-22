@@ -5,9 +5,9 @@ metadata:
   name: prom-aggregation-gateway
 build:
   artifacts:
-    - image: ghcr.io/zapier/prom-aggregation-gateway
+    - image: prom-aggregation-gateway
       custom:
-        buildCommand: earthly +build-docker --version=dev --image_name=ghcr.io/zapier/prom-aggregation-gateway
+        buildCommand: earthly +build-docker --version=$IMAGE_TAG --image_name=$IMAGE_REPO
   tagPolicy:
     customTemplate:
       template: dev
@@ -18,6 +18,7 @@ manifests:
         chartPath: ./charts/prom-aggregation-gateway
         createNamespace: true
         setValues:
-          image.tag: dev
+          controller.image.repository: prom-aggregation-gateway
+          controller.image.tag: dev
           podMonitor.create: false
           serviceMonitor.create: false

@@ -50,11 +50,12 @@ build-binary:
 build-docker:
     FROM alpine:${ALPINE_VERSION}
     COPY +build-binary/prom-aggregation-gateway .
+    ENV GIN_MODE=release
     ENTRYPOINT ["/prom-aggregation-gateway"]
     SAVE IMAGE --push ${image_name}:${version}
 
 continuous-deploy:
-    BUILD +release-helm
+    BUILD +build-helm
 
 build-binaries:
     FROM golang:${GOLANG_VERSION}
@@ -162,21 +163,13 @@ test-helm:
 build-helm:
     FROM quay.io/helmpack/chart-releaser:v${CHART_RELEASER_VERSION}
 
-    WORKDIR /src
-    COPY . /src
-
-    RUN cr --config .github/cr.yaml package charts/*
-    SAVE ARTIFACT .cr-release-packages/ AS LOCAL ./dist
-
-release-helm:
-    FROM quay.io/helmpack/chart-releaser:v${CHART_RELEASER_VERSION}
-
     ARG token
 
     WORKDIR /src
     COPY . /src
 
     RUN cr --config .github/cr.yaml package charts/*
+    SAVE ARTIFACT .cr-release-packages/ AS LOCAL ./dist
 
     RUN mkdir -p .cr-index
     RUN git config --global user.email "opensource@zapier.com"
