@@ -73,6 +73,12 @@ some_counter{job="someJob"} 1
 			"# TYPE some_counter counter\nsome_counter 1\n",
 			"# TYPE some_counter counter\nsome_counter 1\n",
 		},
+		{
+			"duplicate labels",
+			"/metrics/testing/one/testing/two/testing/three",
+			"# TYPE some_counter counter\n some_counter 1\n",
+			"# TYPE some_counter counter\nsome_counter{testing=\"one\",testing=\"two\",testing=\"three\"} 1\n",
+		},
 	}
 
 	for idx, test := range tests {

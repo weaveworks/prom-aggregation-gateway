@@ -158,6 +158,10 @@ counter{a="a",b="b",job="test"} 3
 `
 )
 
+var testLabels = []labelPair{
+	{"job", "test"},
+}
+
 func TestAggregate(t *testing.T) {
 	for _, c := range []struct {
 		testName      string
@@ -176,10 +180,10 @@ func TestAggregate(t *testing.T) {
 			agg := newAggregate(AddIgnoredLabels(c.ignoredLabels...))
 			router := setupAPIRouter("*", agg, metrics.Config{Registry: prometheus.NewRegistry()})
 
-			err := agg.parseAndMerge(strings.NewReader(c.a), map[string]string{"job": "test"})
+			err := agg.parseAndMerge(strings.NewReader(c.a), testLabels)
 			require.NoError(t, err)
 
-			err = agg.parseAndMerge(strings.NewReader(c.b), map[string]string{"job": "test"})
+			err = agg.parseAndMerge(strings.NewReader(c.b), testLabels)
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
@@ -203,7 +207,7 @@ func TestAggregate(t *testing.T) {
 	t.Run("duplicateLabels", func(t *testing.T) {
 		agg := newAggregate()
 
-		err := agg.parseAndMerge(strings.NewReader(duplicateLabels), map[string]string{"job": "test"})
+		err := agg.parseAndMerge(strings.NewReader(duplicateLabels), testLabels)
 		require.Equal(t, err.Error(), duplicateError)
 	})
 }
@@ -228,10 +232,10 @@ func BenchmarkAggregate(b *testing.B) {
 		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				if err := a.parseAndMerge(strings.NewReader(v.input1), map[string]string{"job": "test"}); err != nil {
+				if err := a.parseAndMerge(strings.NewReader(v.input1), testLabels); err != nil {
 					b.Fatalf("unexpected error %s", err)
 				}
-				if err := a.parseAndMerge(strings.NewReader(v.input2), map[string]string{"job": "test"}); err != nil {
+				if err := a.parseAndMerge(strings.NewReader(v.input2), testLabels); err != nil {
 					b.Fatalf("unexpected error %s", err)
 				}
 			}
@@ -244,7 +248,7 @@ func BenchmarkConcurrentAggregate(b *testing.B) {
 	for _, v := range testMetricTable {
 		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
-			if err := a.parseAndMerge(strings.NewReader(v.input1), map[string]string{"job": "test"}); err != nil {
+			if err := a.parseAndMerge(strings.NewReader(v.input1), testLabels); err != nil {
 				b.Fatalf("unexpected error %s", err)
 			}
 
@@ -252,7 +256,7 @@ func BenchmarkConcurrentAggregate(b *testing.B) {
 				g, _ := errgroup.WithContext(context.Background())
 				for tN := 0; tN < 10; tN++ {
 					g.Go(func() error {
-						return a.parseAndMerge(strings.NewReader(v.input2), map[string]string{"job": "test"})
+						return a.parseAndMerge(strings.NewReader(v.input2), testLabels)
 					})
 				}
 

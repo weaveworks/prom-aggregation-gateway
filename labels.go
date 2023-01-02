@@ -9,35 +9,16 @@ import (
 
 func strPtr(s string) *string {
 	return &s
-
 }
 
-func addLabels(m *dto.Metric, labels map[string]string) {
-	found := make(map[string]struct{})
-
-	for _, l := range m.Label {
-		name := l.GetName()
-
-		value, ok := labels[name]
-		if !ok {
-			continue
-		}
-
-		l.Value = strPtr(value)
-		found[name] = struct{}{}
-	}
-
-	for name, value := range labels {
-		if _, ok := found[name]; ok {
-			continue
-		}
-
-		pair := dto.LabelPair{Name: strPtr(name), Value: strPtr(value)}
+func addLabels(m *dto.Metric, labels []labelPair) {
+	for _, label := range labels {
+		pair := dto.LabelPair{Name: strPtr(label.name), Value: strPtr(label.value)}
 		m.Label = append(m.Label, &pair)
 	}
 }
 
-func (a *aggregate) formatLabels(m *dto.Metric, labels map[string]string) {
+func (a *aggregate) formatLabels(m *dto.Metric, labels []labelPair) {
 	addLabels(m, labels)
 	sort.Sort(byName(m.Label))
 

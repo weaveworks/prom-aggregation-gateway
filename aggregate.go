@@ -109,7 +109,7 @@ func (a *aggregate) saveFamily(familyName string, family *dto.MetricFamily) erro
 	return nil
 }
 
-func (a *aggregate) parseAndMerge(r io.Reader, labels map[string]string) error {
+func (a *aggregate) parseAndMerge(r io.Reader, labels []labelPair) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -193,42 +193,51 @@ func (a *aggregate) encodeMetric(name string, enc expfmt.Encoder) bool {
 var ErrOddNumberOfLabelParts = errors.New("labels must be defined in pairs")
 
 func (a *aggregate) handleInsert(c *gin.Context) {
-	labelParts, err := parseLabelsInPath(c)
+	labelParts, jobName, err := parseLabelsInPath(c)
 	if err != nil {
 		log.Println(err)
 		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	labels := make(map[string]string)
-	for idx := 0; idx < len(labelParts); idx += 2 {
-		name := labelParts[idx]
-		value := labelParts[idx+1]
-		labels[name] = value
-	}
-
-	if err := a.parseAndMerge(c.Request.Body, labels); err != nil {
+	if err := a.parseAndMerge(c.Request.Body, labelParts); err != nil {
 		log.Println(err)
 		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	job := labels["job"]
-	MetricPushes.WithLabelValues(job).Inc()
+	MetricPushes.WithLabelValues(jobName).Inc()
 	c.Status(http.StatusAccepted)
 }
 
-func parseLabelsInPath(c *gin.Context) ([]string, error) {
+type labelPair struct {
+	name, value string
+}
+
+func parseLabelsInPath(c *gin.Context) ([]labelPair, string, error) {
 	labelString := c.Param("labels")
 	labelString = strings.Trim(labelString, "/")
 	if labelString == "" {
-		return nil, nil
+		return nil, "", nil
 	}
 
 	labelParts := strings.Split(labelString, "/")
 	if len(labelParts)%2 != 0 {
-		return nil, ErrOddNumberOfLabelParts
+		return nil, "", ErrOddNumberOfLabelParts
 	}
 
-	return labelParts, nil
+	var (
+		labelPairs []labelPair
+		jobName    string
+	)
+	for idx := 0; idx < len(labelParts); idx += 2 {
+		name := labelParts[idx]
+		value := labelParts[idx+1]
+		labelPairs = append(labelPairs, labelPair{name, value})
+		if name == "job" {
+			jobName = value
+		}
+	}
+
+	return labelPairs, jobName, nil
 }
