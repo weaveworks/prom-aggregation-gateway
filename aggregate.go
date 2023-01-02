@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -109,7 +109,7 @@ func (a *aggregate) saveFamily(familyName string, family *dto.MetricFamily) erro
 	return nil
 }
 
-func (a *aggregate) parseAndMerge(r io.Reader, job string) error {
+func (a *aggregate) parseAndMerge(r io.Reader, labels map[string]string) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -119,7 +119,7 @@ func (a *aggregate) parseAndMerge(r io.Reader, job string) error {
 	for name, family := range inFamilies {
 		// Sort labels in case source sends them inconsistently
 		for _, m := range family.Metric {
-			a.formatLabels(m, job)
+			a.formatLabels(m, labels)
 		}
 
 		if err := validateFamily(family); err != nil {
@@ -190,21 +190,45 @@ func (a *aggregate) encodeMetric(name string, enc expfmt.Encoder) bool {
 	return false
 }
 
+var ErrOddNumberOfLabelParts = errors.New("labels must be defined in pairs")
+
 func (a *aggregate) handleInsert(c *gin.Context) {
-	job := c.Param("job")
-	// TODO: add logic to verify correct format of job label
-	if job == "" {
-		err := fmt.Errorf("must send in a valid job name, sent: %s", job)
+	labelParts, err := parseLabelsInPath(c)
+	if err != nil {
 		log.Println(err)
 		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := a.parseAndMerge(c.Request.Body, job); err != nil {
+	labels := make(map[string]string)
+	for idx := 0; idx < len(labelParts); idx += 2 {
+		name := labelParts[idx]
+		value := labelParts[idx+1]
+		labels[name] = value
+	}
+
+	if err := a.parseAndMerge(c.Request.Body, labels); err != nil {
 		log.Println(err)
 		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	job := labels["job"]
 	MetricPushes.WithLabelValues(job).Inc()
+	c.Status(http.StatusAccepted)
+}
+
+func parseLabelsInPath(c *gin.Context) ([]string, error) {
+	labelString := c.Param("labels")
+	labelString = strings.Trim(labelString, "/")
+	if labelString == "" {
+		return nil, nil
+	}
+
+	labelParts := strings.Split(labelString, "/")
+	if len(labelParts)%2 != 0 {
+		return nil, ErrOddNumberOfLabelParts
+	}
+
+	return labelParts, nil
 }

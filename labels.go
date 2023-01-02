@@ -12,22 +12,33 @@ func strPtr(s string) *string {
 
 }
 
-var JobLabel = strPtr("job")
+func addLabels(m *dto.Metric, labels map[string]string) {
+	found := make(map[string]struct{})
 
-func addJobLabel(m *dto.Metric, job string) {
-	if len(m.Label) > 0 {
-		for _, l := range m.Label {
-			if l.GetName() == "job" {
-				l.Value = strPtr(job)
-				return
-			}
+	for _, l := range m.Label {
+		name := l.GetName()
+
+		value, ok := labels[name]
+		if !ok {
+			continue
 		}
+
+		l.Value = strPtr(value)
+		found[name] = struct{}{}
 	}
-	m.Label = append(m.Label, &dto.LabelPair{Name: JobLabel, Value: strPtr(job)})
+
+	for name, value := range labels {
+		if _, ok := found[name]; ok {
+			continue
+		}
+
+		pair := dto.LabelPair{Name: strPtr(name), Value: strPtr(value)}
+		m.Label = append(m.Label, &pair)
+	}
 }
 
-func (a *aggregate) formatLabels(m *dto.Metric, job string) {
-	addJobLabel(m, job)
+func (a *aggregate) formatLabels(m *dto.Metric, labels map[string]string) {
+	addLabels(m, labels)
 	sort.Sort(byName(m.Label))
 
 	if len(a.options.ignoredLabels) > 0 {
