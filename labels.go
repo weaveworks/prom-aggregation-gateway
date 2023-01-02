@@ -9,25 +9,17 @@ import (
 
 func strPtr(s string) *string {
 	return &s
-
 }
 
-var JobLabel = strPtr("job")
-
-func addJobLabel(m *dto.Metric, job string) {
-	if len(m.Label) > 0 {
-		for _, l := range m.Label {
-			if l.GetName() == "job" {
-				l.Value = strPtr(job)
-				return
-			}
-		}
+func addLabels(m *dto.Metric, labels []labelPair) {
+	for _, label := range labels {
+		pair := dto.LabelPair{Name: strPtr(label.name), Value: strPtr(label.value)}
+		m.Label = append(m.Label, &pair)
 	}
-	m.Label = append(m.Label, &dto.LabelPair{Name: JobLabel, Value: strPtr(job)})
 }
 
-func (a *aggregate) formatLabels(m *dto.Metric, job string) {
-	addJobLabel(m, job)
+func (a *aggregate) formatLabels(m *dto.Metric, labels []labelPair) {
+	addLabels(m, labels)
 	sort.Sort(byName(m.Label))
 
 	if len(a.options.ignoredLabels) > 0 {

@@ -21,14 +21,21 @@ func setupAPIRouter(corsDomain string, agg *aggregate, promConfig metrics.Config
 	})
 
 	r := gin.New()
+	r.RedirectTrailingSlash = false
 
 	r.GET("/metrics",
-		mGin.Handler("metrics", metricsMiddleware),
+		mGin.Handler("getMetrics", metricsMiddleware),
 		cors.New(corsConfig),
 		agg.handleRender)
-	r.POST("/metrics/job/:job",
-		mGin.Handler("/metrics/job", metricsMiddleware),
-		agg.handleInsert)
+
+	insertHandler := mGin.Handler("postMetrics", metricsMiddleware)
+	insertMethods := []func(string, ...gin.HandlerFunc) gin.IRoutes{r.POST, r.PUT}
+	insertPaths := []string{"/metrics", "/metrics/*labels"}
+	for _, method := range insertMethods {
+		for _, path := range insertPaths {
+			method(path, insertHandler, agg.handleInsert)
+		}
+	}
 
 	return r
 }
