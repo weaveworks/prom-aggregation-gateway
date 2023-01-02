@@ -17,6 +17,15 @@ E.g. if you have the program running locally:
 echo 'http_requests_total{method="post",code="200"} 1027' | curl --data-binary @- http://localhost/metrics/
 ```
 
+You can also add labels that will apply to all metrics that are passed. For example, the following will add the `domain="sometest.com"` and `instance="nginx-1"` labels to both metrics:
+
+```bash
+echo '
+http_requests_total{method="post",code="200"} 1027
+http_errors_total{method="post",code="500"} 6
+' | curl --data-binary @- http://localhost/metrics/domain/sometest.com/instance/nginx-1
+```
+
 Now you can push your metrics using your favorite Prometheus client.
 
 E.g. in Python using [prometheus/client_python](https://github.com/prometheus/client_python):
