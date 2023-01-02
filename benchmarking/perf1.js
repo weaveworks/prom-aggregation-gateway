@@ -26,10 +26,15 @@ function getRandInteger(min, max) {
   return Math.floor(Math.random() * (max - min) ) + min;
 }
 
+function randChoice(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 export default function () {
-  const randomJob = jobs[Math.floor(Math.random() * jobs.length)];
-  const randomLabel = labels[Math.floor(Math.random() * labels.length)];
-  const randomValue = labelValues[Math.floor(Math.random() * labelValues.length)];
+  const randomJob = randChoice(jobs);
+  const randomLabel = randChoice(labels);
+  const randomValue = randChoice(labelValues);
+
   const url = `${__ENV.PAG_HOST}/metrics/job/${randomJob}/${randomLabel}/${randomValue}`;
   const randomMetric1 = getRandInteger(1, 50)
   const randomMetric2 = getRandInteger(1000, 3000)
@@ -51,5 +56,5 @@ export default function () {
   };
 
   const res = http.post(url, payload, params);
-  check(res, { 'status was 202': (r) => r.status < 300 });
+  check(res, { 'status was 200ish': (r) => r.status < 300 });
 }
