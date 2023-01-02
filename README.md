@@ -60,6 +60,63 @@ helm repo update
 helm search repo pag -l
 ```
 
+## Contributing
+To run the server you can run:
+
+```
+go run .
+```
+
+### Testing
+To run the tests you can run:
+
+```
+go test
+```
+
+### VSCode
+To debug locally you can setup a launch.json with the following:
+
+```
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Debug prom-agg-gateway",
+        "type": "go",
+        "request": "launch",
+        "mode": "debug",
+        "program": "${workspaceFolder}",
+        "args": [
+          "run",
+          "."
+        ]
+      }
+    ]
+  }
+```
+
+Then you'll be able to launch prom-agg-gateway locally and debug it from within VSCode.  You
+must have [Delve](https://github.com/derekparker/delve) installed locally for this to work.
+
+If you want a debugger that will launch the tests you can create this configuration:
+
+```
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Test Current File",
+        "type": "go",
+        "request": "launch",
+        "mode": "test",
+        "program": "${workspaceFolder}/${relativeFileDirname}",
+        "showLog": true
+      }
+    ]
+  }
+  ```
+
 ## Comparison to [Prometheus Pushgateway](https://github.com/prometheus/pushgateway)
 
 According to https://prometheus.io/docs/practices/pushing/:
