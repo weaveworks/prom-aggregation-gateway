@@ -33,7 +33,23 @@ Then have your Prometheus scrape metrics at `/metrics`.
 
 ## Ready-built images
 
-Available on DockerHub `weaveworks/prom-aggregation-gateway`
+Container images are published here:
+
+https://ghcr.io/zapier/prom-aggregation-gateway
+
+## Helm Chart
+
+Helm Charts are published here:
+
+https://zapier.github.io/prom-aggregation-gateway/
+
+You can use them:
+
+```
+helm repo add pag https://zapier.github.io/prom-aggregation-gateway/
+helm repo update
+helm search repo pag -l
+```
 
 ## Comparison to [Prometheus Pushgateway](https://github.com/prometheus/pushgateway)
 
@@ -47,18 +63,20 @@ This restriction makes the Prometheus pushgateway inappropriate for the usecase 
 
 Prom-aggregation-gateway presents a similar API, but does not attempt to be a drop-in replacement.
 
-## JS Client Library
+## Client Libraries
+### Python
+- https://github.com/prometheus/client_python
 
-See https://github.com/weaveworks/promjs/ for a JS client library for Prometheus that can be used from within a web app.
+### JS
+- https://github.com/siimon/prom-client
+- https://github.com/weaveworks/promjs/
 
 ## <a name="help"></a>Getting Help
 
 If you have any questions about, feedback for or problems with `prom-aggregation-gateway`:
 
-- Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
-- Ask a question on the [#general](https://weave-community.slack.com/messages/general/) slack channel.
-- [File an issue](https://github.com/weaveworks/prom-aggregation-gateway/issues/new).
+- [File an issue](https://github.com/zapier/prom-aggregation-gateway/issues/new).
 
-Weaveworks follows the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md). Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting a Weaveworks project maintainer, or Alexis Richardson (alexis@weave.works).
+prom-aggregation-gateway follows the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md). Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting a project maintainer.
 
 Your feedback is always welcome!
