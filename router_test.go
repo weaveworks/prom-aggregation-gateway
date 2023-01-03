@@ -130,7 +130,7 @@ func TestAuthRouter(t *testing.T) {
 		expected               string
 	}{
 		{
-			"no labels, no trailing slash",
+			"Passing 202 basic auth",
 			"/metrics",
 			"# TYPE some_counter counter\nsome_counter 1\n",
 			gin.Accounts{"user": "password"},
@@ -139,7 +139,7 @@ func TestAuthRouter(t *testing.T) {
 			"# TYPE some_counter counter\nsome_counter 1\n",
 		},
 		{
-			"no labels, no trailing slash",
+			"Failing 401 basic auth",
 			"/metrics",
 			"# TYPE some_counter counter\nsome_counter 1\n",
 			gin.Accounts{"user": "password"},

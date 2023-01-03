@@ -23,7 +23,7 @@ func main() {
 	flag.StringVar(&apiListen, "apiListen", ":80", "Listen for API requests on this host/port.")
 	flag.StringVar(&lifecycleListen, "lifecycleListen", ":8888", "Listen for lifecycle requests (health, metrics) on this host/port")
 	flag.StringVar(&corsDomain, "cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
-	flag.StringVar(&auth, "auth", "", "The 'Access-Control-Allow-Origin' value to be returned.")
+	flag.StringVar(&auth, "auth", "", "A list of comma separated user=passwords for basic auth creds")
 	flag.BoolVar(&showVersion, "version", false, "Display the version")
 	flag.Parse()
 
