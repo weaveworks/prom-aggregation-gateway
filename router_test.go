@@ -16,6 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func setupTestRouter(cfg apiRouterConfig) *gin.Engine {
+	agg := newAggregate()
+	promConfig := metrics.Config{
+		Registry: prometheus.NewRegistry(),
+	}
+	return setupAPIRouter(cfg, agg, promConfig)
+}
+
 func TestHealthCheck(t *testing.T) {
 	router := gin.New()
 	router.GET("/", handleHealthCheck)
@@ -82,13 +90,9 @@ some_counter{job="someJob"} 1
 	}
 
 	for idx, test := range tests {
-		t.Run(fmt.Sprintf("test #%d: %s", idx+1, test), func(t *testing.T) {
+		t.Run(fmt.Sprintf("test #%d: %s", idx+1, test.name), func(t *testing.T) {
 			// setup router
-			agg := newAggregate()
-			promConfig := metrics.Config{
-				Registry: prometheus.NewRegistry(),
-			}
-			router := setupAPIRouter("https://cors-domain", agg, promConfig)
+			router := setupTestRouter(apiRouterConfig{corsDomain: "https://cors-domain"})
 
 			// ---- insert metric ----
 			// setup request
@@ -112,6 +116,67 @@ some_counter{job="someJob"} 1
 			assert.Equal(t, 200, w.Code)
 			body := w.Body.String()
 			assert.Equal(t, test.expected, body)
+		})
+	}
+}
+
+func TestAuthRouter(t *testing.T) {
+	tests := []struct {
+		name                   string
+		path, metric           string
+		accounts               gin.Accounts
+		authName, authPassword string
+		statusCode             int
+		expected               string
+	}{
+		{
+			"Passing 202 basic auth",
+			"/metrics",
+			"# TYPE some_counter counter\nsome_counter 1\n",
+			gin.Accounts{"user": "password"},
+			"user", "password",
+			202,
+			"# TYPE some_counter counter\nsome_counter 1\n",
+		},
+		{
+			"Failing 401 basic auth",
+			"/metrics",
+			"# TYPE some_counter counter\nsome_counter 1\n",
+			gin.Accounts{"user": "password"},
+			"user1", "password1",
+			401,
+			"",
+		},
+	}
+
+	for idx, test := range tests {
+		t.Run(fmt.Sprintf("test #%d: %s", idx+1, test.name), func(t *testing.T) {
+			// setup router
+			router := setupTestRouter(apiRouterConfig{corsDomain: "https://cors-domain", accounts: test.accounts})
+
+			buf := bytes.NewBufferString(test.metric)
+			req, err := http.NewRequest("PUT", test.path, buf)
+			require.NoError(t, err)
+
+			req.SetBasicAuth(test.authName, test.authPassword)
+
+			// make request
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, test.statusCode, w.Code)
+
+			// ---- retrieve metric ----
+			req, err = http.NewRequest("GET", "/metrics", nil)
+			require.NoError(t, err)
+
+			w = httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, 200, w.Code)
+			body := w.Body.String()
+			assert.Equal(t, test.expected, body)
+
 		})
 	}
 }
