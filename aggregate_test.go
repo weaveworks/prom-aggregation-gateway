@@ -178,7 +178,7 @@ func TestAggregate(t *testing.T) {
 	} {
 		t.Run(c.testName, func(t *testing.T) {
 			agg := newAggregate(AddIgnoredLabels(c.ignoredLabels...))
-			router := setupAPIRouter("*", agg, metrics.Config{Registry: prometheus.NewRegistry()})
+			router := setupAPIRouter(apiRouterConfig{corsDomain: "*"}, agg, metrics.Config{Registry: prometheus.NewRegistry()})
 
 			err := agg.parseAndMerge(strings.NewReader(c.a), testLabels)
 			require.NoError(t, err)

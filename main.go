@@ -17,12 +17,13 @@ var (
 )
 
 func main() {
-	var apiListen, lifecycleListen, corsDomain string
+	var apiListen, lifecycleListen, corsDomain, auth string
 	var showVersion bool
 
 	flag.StringVar(&apiListen, "apiListen", ":80", "Listen for API requests on this host/port.")
 	flag.StringVar(&lifecycleListen, "lifecycleListen", ":8888", "Listen for lifecycle requests (health, metrics) on this host/port")
 	flag.StringVar(&corsDomain, "cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
+	flag.StringVar(&auth, "auth", "", "The 'Access-Control-Allow-Origin' value to be returned.")
 	flag.BoolVar(&showVersion, "version", false, "Display the version")
 	flag.Parse()
 
@@ -31,10 +32,15 @@ func main() {
 		return
 	}
 
-	runServers(corsDomain, apiListen, lifecycleListen)
+	cfg := apiRouterConfig{
+		corsDomain: corsDomain,
+		accounts:   processAuthConfig(auth),
+	}
+
+	runServers(cfg, apiListen, lifecycleListen)
 }
 
-func runServers(corsDomain string, apiListen string, lifecycleListen string) {
+func runServers(cfg apiRouterConfig, apiListen string, lifecycleListen string) {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, syscall.SIGTERM, syscall.SIGINT)
 
@@ -44,7 +50,7 @@ func runServers(corsDomain string, apiListen string, lifecycleListen string) {
 		Registry: promRegistry,
 	}
 
-	apiRouter := setupAPIRouter(corsDomain, agg, promMetricsConfig)
+	apiRouter := setupAPIRouter(cfg, agg, promMetricsConfig)
 	go runServer("api", apiRouter, apiListen)
 
 	lifecycleRouter := setupLifecycleRouter(promRegistry)

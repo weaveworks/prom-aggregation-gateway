@@ -8,10 +8,26 @@ import (
 	mGin "github.com/slok/go-http-metrics/middleware/gin"
 )
 
-func setupAPIRouter(corsDomain string, agg *aggregate, promConfig metrics.Config) *gin.Engine {
+type apiRouterConfig struct {
+	corsDomain string
+	accounts   gin.Accounts
+}
+
+func createHandlers(endpointName string,
+	metricMiddleware middleware.Middleware,
+	neededHandlers []gin.HandlerFunc,
+	handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+	h := []gin.HandlerFunc{
+		mGin.Handler(endpointName, metricMiddleware),
+	}
+	h = append(h, neededHandlers...)
+	return append(h, handlers...)
+}
+
+func setupAPIRouter(cfg apiRouterConfig, agg *aggregate, promConfig metrics.Config) *gin.Engine {
 	corsConfig := cors.Config{}
-	if corsDomain != "*" {
-		corsConfig.AllowOrigins = []string{corsDomain}
+	if cfg.corsDomain != "*" {
+		corsConfig.AllowOrigins = []string{cfg.corsDomain}
 	} else {
 		corsConfig.AllowAllOrigins = true
 	}
@@ -23,17 +39,26 @@ func setupAPIRouter(corsDomain string, agg *aggregate, promConfig metrics.Config
 	r := gin.New()
 	r.RedirectTrailingSlash = false
 
+	// add metric middleware for NoRoute handler
+	r.NoRoute(mGin.Handler("noRoute", metricsMiddleware))
+
+	neededHandlers := []gin.HandlerFunc{}
+
+	if len(cfg.accounts) > 0 {
+		neededHandlers = append(neededHandlers, gin.BasicAuth(cfg.accounts))
+	}
+
 	r.GET("/metrics",
 		mGin.Handler("getMetrics", metricsMiddleware),
 		cors.New(corsConfig),
-		agg.handleRender)
+		agg.handleRender,
+	)
 
-	insertHandler := mGin.Handler("postMetrics", metricsMiddleware)
 	insertMethods := []func(string, ...gin.HandlerFunc) gin.IRoutes{r.POST, r.PUT}
 	insertPaths := []string{"/metrics", "/metrics/*labels"}
 	for _, method := range insertMethods {
 		for _, path := range insertPaths {
-			method(path, insertHandler, agg.handleInsert)
+			method(path, createHandlers("postMetrics", metricsMiddleware, neededHandlers, agg.handleInsert)...)
 		}
 	}
 
