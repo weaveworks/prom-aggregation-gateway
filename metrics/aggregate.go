@@ -109,7 +109,7 @@ func (a *Aggregate) saveFamily(familyName string, family *dto.MetricFamily) erro
 	return nil
 }
 
-func (a *Aggregate) parseAndMerge(r io.Reader, labels []LabelPair) error {
+func (a *Aggregate) parseAndMerge(r io.Reader, labels []labelPair) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -215,11 +215,11 @@ func (a *Aggregate) HandleInsert(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
-type LabelPair struct {
+type labelPair struct {
 	name, value string
 }
 
-func parseLabelsInPath(c *gin.Context) ([]LabelPair, string, error) {
+func parseLabelsInPath(c *gin.Context) ([]labelPair, string, error) {
 	labelString := c.Param("labels")
 	labelString = strings.Trim(labelString, "/")
 	if labelString == "" {
@@ -232,13 +232,13 @@ func parseLabelsInPath(c *gin.Context) ([]LabelPair, string, error) {
 	}
 
 	var (
-		labelPairs []LabelPair
+		labelPairs []labelPair
 		jobName    string
 	)
 	for idx := 0; idx < len(labelParts); idx += 2 {
 		name := labelParts[idx]
 		value := labelParts[idx+1]
-		labelPairs = append(labelPairs, LabelPair{name, value})
+		labelPairs = append(labelPairs, labelPair{name, value})
 		if name == "job" {
 			jobName = value
 		}

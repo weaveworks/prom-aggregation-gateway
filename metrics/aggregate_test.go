@@ -157,7 +157,7 @@ counter{a="a",b="b",job="test"} 3
 `
 )
 
-var testLabels = []LabelPair{
+var testLabels = []labelPair{
 	{"job", "test"},
 }
 

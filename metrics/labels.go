@@ -11,14 +11,14 @@ func strPtr(s string) *string {
 	return &s
 }
 
-func addLabels(m *dto.Metric, labels []LabelPair) {
+func addLabels(m *dto.Metric, labels []labelPair) {
 	for _, label := range labels {
 		pair := dto.LabelPair{Name: strPtr(label.name), Value: strPtr(label.value)}
 		m.Label = append(m.Label, &pair)
 	}
 }
 
-func (a *Aggregate) formatLabels(m *dto.Metric, labels []LabelPair) {
+func (a *Aggregate) formatLabels(m *dto.Metric, labels []labelPair) {
 	addLabels(m, labels)
 	sort.Sort(byName(m.Label))
 

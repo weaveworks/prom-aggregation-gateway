@@ -28,7 +28,7 @@ func (a byLabel) Len() int           { return len(a) }
 func (a byLabel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byLabel) Less(i, j int) bool { return labelsLessThan(a[i].Label, a[j].Label) }
 
-// Sort a slice of LabelPairs by name
+// Sort a slice of labelPairs by name
 type byName []*dto.LabelPair
 
 func (a byName) Len() int           { return len(a) }

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var TestLabels = []LabelPair{
+var TestLabels = []labelPair{
 	{"job", "test"},
 }
 
@@ -24,7 +24,7 @@ func TestFormatLabels(t *testing.T) {
 			{},
 		},
 	}
-	a.formatLabels(m, []LabelPair{{"job", "test"}, {"thing3", "value3"}})
+	a.formatLabels(m, []labelPair{{"job", "test"}, {"thing3", "value3"}})
 
 	assert.Equal(t, &dto.LabelPair{Name: strPtr("job"), Value: strPtr("test")}, m.Label[0])
 	assert.Equal(t, &dto.LabelPair{Name: strPtr("thing1"), Value: strPtr("value1")}, m.Label[1])
