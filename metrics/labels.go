@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"sort"
@@ -18,7 +18,7 @@ func addLabels(m *dto.Metric, labels []labelPair) {
 	}
 }
 
-func (a *aggregate) formatLabels(m *dto.Metric, labels []labelPair) {
+func (a *Aggregate) formatLabels(m *dto.Metric, labels []labelPair) {
 	addLabels(m, labels)
 	sort.Sort(byName(m.Label))
 

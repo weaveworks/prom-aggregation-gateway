@@ -1,16 +1,18 @@
-package main
+package routers
 
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
+	promMetrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	mGin "github.com/slok/go-http-metrics/middleware/gin"
+	"github.com/zapier/prom-aggregation-gateway/metrics"
 )
 
-type apiRouterConfig struct {
-	corsDomain string
-	accounts   gin.Accounts
+type ApiRouterConfig struct {
+	CorsDomain   string
+	Accounts     []string
+	authAccounts gin.Accounts
 }
 
 func createHandlers(endpointName string,
@@ -24,16 +26,17 @@ func createHandlers(endpointName string,
 	return append(h, handlers...)
 }
 
-func setupAPIRouter(cfg apiRouterConfig, agg *aggregate, promConfig metrics.Config) *gin.Engine {
+func setupAPIRouter(cfg ApiRouterConfig, agg *metrics.Aggregate, promConfig promMetrics.Config) *gin.Engine {
 	corsConfig := cors.Config{}
-	if cfg.corsDomain != "*" {
-		corsConfig.AllowOrigins = []string{cfg.corsDomain}
+	if cfg.CorsDomain != "*" {
+		corsConfig.AllowOrigins = []string{cfg.CorsDomain}
 	} else {
 		corsConfig.AllowAllOrigins = true
 	}
+	cfg.authAccounts = processAuthConfig(cfg.Accounts)
 
 	metricsMiddleware := middleware.New(middleware.Config{
-		Recorder: metrics.NewRecorder(promConfig),
+		Recorder: promMetrics.NewRecorder(promConfig),
 	})
 
 	r := gin.New()
@@ -44,21 +47,21 @@ func setupAPIRouter(cfg apiRouterConfig, agg *aggregate, promConfig metrics.Conf
 
 	neededHandlers := []gin.HandlerFunc{}
 
-	if len(cfg.accounts) > 0 {
-		neededHandlers = append(neededHandlers, gin.BasicAuth(cfg.accounts))
+	if len(cfg.Accounts) > 0 {
+		neededHandlers = append(neededHandlers, gin.BasicAuth(cfg.authAccounts))
 	}
 
 	r.GET("/metrics",
 		mGin.Handler("getMetrics", metricsMiddleware),
 		cors.New(corsConfig),
-		agg.handleRender,
+		agg.HandleRender,
 	)
 
 	insertMethods := []func(string, ...gin.HandlerFunc) gin.IRoutes{r.POST, r.PUT}
 	insertPaths := []string{"/metrics", "/metrics/*labels"}
 	for _, method := range insertMethods {
 		for _, path := range insertPaths {
-			method(path, createHandlers("postMetrics", metricsMiddleware, neededHandlers, agg.handleInsert)...)
+			method(path, createHandlers("postMetrics", metricsMiddleware, neededHandlers, agg.HandleInsert)...)
 		}
 	}
 

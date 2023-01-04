@@ -1,15 +1,14 @@
-package main
+package metrics
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
-	"github.com/prometheus/client_golang/prometheus"
-	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
+	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -163,6 +162,8 @@ var testLabels = []labelPair{
 }
 
 func TestAggregate(t *testing.T) {
+	contentType := expfmt.FmtText
+
 	for _, c := range []struct {
 		testName      string
 		a, b          string
@@ -177,8 +178,7 @@ func TestAggregate(t *testing.T) {
 		{"ignoredLabels", ignoredLabels1, ignoredLabels2, ignoredLabelsResult, []string{"ignore_me"}},
 	} {
 		t.Run(c.testName, func(t *testing.T) {
-			agg := newAggregate(AddIgnoredLabels(c.ignoredLabels...))
-			router := setupAPIRouter(apiRouterConfig{corsDomain: "*"}, agg, metrics.Config{Registry: prometheus.NewRegistry()})
+			agg := NewAggregate(AddIgnoredLabels(c.ignoredLabels...))
 
 			err := agg.parseAndMerge(strings.NewReader(c.a), testLabels)
 			require.NoError(t, err)
@@ -186,12 +186,10 @@ func TestAggregate(t *testing.T) {
 			err = agg.parseAndMerge(strings.NewReader(c.b), testLabels)
 			require.NoError(t, err)
 
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/metrics", nil)
+			buf := new(bytes.Buffer)
+			agg.encodeAllMetrics(buf, contentType)
 
-			router.ServeHTTP(w, r)
-
-			if have := w.Body.String(); have != c.want {
+			if have := buf.String(); have != c.want {
 				text, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
 					A:        difflib.SplitLines(c.want),
 					B:        difflib.SplitLines(have),
@@ -205,7 +203,7 @@ func TestAggregate(t *testing.T) {
 	}
 
 	t.Run("duplicateLabels", func(t *testing.T) {
-		agg := newAggregate()
+		agg := NewAggregate()
 
 		err := agg.parseAndMerge(strings.NewReader(duplicateLabels), testLabels)
 		require.Equal(t, err.Error(), duplicateError)
@@ -227,7 +225,7 @@ var testMetricTable = []struct {
 }
 
 func BenchmarkAggregate(b *testing.B) {
-	a := newAggregate()
+	a := NewAggregate()
 	for _, v := range testMetricTable {
 		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
@@ -244,7 +242,7 @@ func BenchmarkAggregate(b *testing.B) {
 }
 
 func BenchmarkConcurrentAggregate(b *testing.B) {
-	a := newAggregate()
+	a := NewAggregate()
 	for _, v := range testMetricTable {
 		a.options.ignoredLabels = v.ignoredLabels
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {

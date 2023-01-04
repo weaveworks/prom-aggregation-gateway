@@ -1,4 +1,4 @@
-package main
+package routers
 
 import (
 	"strings"
@@ -6,9 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func processAuthConfig(auth string) gin.Accounts {
+func processAuthConfig(authList []string) gin.Accounts {
 	authAccounts := gin.Accounts{}
-	authList := strings.Split(auth, ",")
 	if len(authList) == 0 {
 		return authAccounts
 	}
