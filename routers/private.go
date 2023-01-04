@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/zapier/prom-aggregation-gateway/config"
 )
 
 func setupLifecycleRouter(promRegistry *prometheus.Registry) *gin.Engine {
@@ -30,10 +31,18 @@ func convertHandler(h http.Handler) gin.HandlerFunc {
 }
 
 type HealthResponse struct {
-	IsAlive bool `json:"alive"`
+	Name      string `json:"name"`
+	IsAlive   bool   `json:"alive"`
+	Version   string `json:"version"`
+	CommitSHA string `json:"commitSHA"`
 }
 
 func handleHealthCheck(c *gin.Context) {
 	c.Header("Content-Type", "application/json")
-	c.JSON(http.StatusOK, HealthResponse{IsAlive: true})
+	c.JSON(http.StatusOK, HealthResponse{
+		Name:      config.Name,
+		Version:   config.Version,
+		CommitSHA: config.CommitSHA,
+		IsAlive:   true,
+	})
 }
