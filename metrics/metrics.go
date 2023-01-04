@@ -1,13 +1,13 @@
-package main
+package metrics
 
 import "github.com/prometheus/client_golang/prometheus"
 
 const MetricsNamespace = "prom_agg_gateway"
 
-var promRegistry = prometheus.NewRegistry()
+var PromRegistry = prometheus.NewRegistry()
 
 func init() {
-	promRegistry.MustRegister(
+	PromRegistry.MustRegister(
 		TotalFamiliesGauge,
 		MetricCountByFamily,
 		MetricPushes,
@@ -36,13 +36,13 @@ var MetricCountByFamily = prometheus.NewGaugeVec(
 var MetricCountByType = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Namespace: MetricsNamespace,
-		Name: "metrics_by_type",
-		Help: "Metric count by type",
+		Name:      "metrics_by_type",
+		Help:      "Metric count by type",
 	},
 	[]string{
 		"metric_type",
 	},
-);
+)
 
 var MetricPushes = prometheus.NewCounterVec(
 	prometheus.CounterOpts{

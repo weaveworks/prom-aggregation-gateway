@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"errors"
@@ -20,7 +20,7 @@ type metricFamily struct {
 	lock sync.RWMutex
 }
 
-type aggregate struct {
+type Aggregate struct {
 	familiesLock sync.RWMutex
 	families     map[string]*metricFamily
 	options      aggregateOptions
@@ -33,22 +33,22 @@ type aggregateOptions struct {
 	metricTTLDuration *time.Duration
 }
 
-type aggregateOptionsFunc func(a *aggregate)
+type aggregateOptionsFunc func(a *Aggregate)
 
 func AddIgnoredLabels(ignoredLabels ...string) aggregateOptionsFunc {
-	return func(a *aggregate) {
+	return func(a *Aggregate) {
 		a.options.ignoredLabels = ignoredLabels
 	}
 }
 
 func SetTTLMetricTime(duration *time.Duration) aggregateOptionsFunc {
-	return func(a *aggregate) {
+	return func(a *Aggregate) {
 		a.options.metricTTLDuration = duration
 	}
 }
 
-func newAggregate(opts ...aggregateOptionsFunc) *aggregate {
-	a := &aggregate{
+func NewAggregate(opts ...aggregateOptionsFunc) *Aggregate {
+	a := &Aggregate{
 		families: map[string]*metricFamily{},
 		options: aggregateOptions{
 			ignoredLabels: []string{},
@@ -78,7 +78,7 @@ func (ao *aggregateOptions) formatIgnoredLabels() {
 	sort.Strings(ao.ignoredLabels)
 }
 
-func (a *aggregate) Len() int {
+func (a *Aggregate) Len() int {
 	a.familiesLock.RLock()
 	count := len(a.families)
 	a.familiesLock.RUnlock()
@@ -86,7 +86,7 @@ func (a *aggregate) Len() int {
 }
 
 // setFamilyOrGetExistingFamily either sets a new family or returns an existing family
-func (a *aggregate) setFamilyOrGetExistingFamily(familyName string, family *dto.MetricFamily) *metricFamily {
+func (a *Aggregate) setFamilyOrGetExistingFamily(familyName string, family *dto.MetricFamily) *metricFamily {
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
 	existingFamily, ok := a.families[familyName]
@@ -97,7 +97,7 @@ func (a *aggregate) setFamilyOrGetExistingFamily(familyName string, family *dto.
 	return existingFamily
 }
 
-func (a *aggregate) saveFamily(familyName string, family *dto.MetricFamily) error {
+func (a *Aggregate) saveFamily(familyName string, family *dto.MetricFamily) error {
 	existingFamily := a.setFamilyOrGetExistingFamily(familyName, family)
 	if existingFamily != nil {
 		err := existingFamily.mergeFamily(family)
@@ -109,7 +109,7 @@ func (a *aggregate) saveFamily(familyName string, family *dto.MetricFamily) erro
 	return nil
 }
 
-func (a *aggregate) parseAndMerge(r io.Reader, labels []labelPair) error {
+func (a *Aggregate) parseAndMerge(r io.Reader, labels []LabelPair) error {
 	var parser expfmt.TextParser
 	inFamilies, err := parser.TextToMetricFamilies(r)
 	if err != nil {
@@ -142,10 +142,16 @@ func (a *aggregate) parseAndMerge(r io.Reader, labels []labelPair) error {
 	return nil
 }
 
-func (a *aggregate) handleRender(c *gin.Context) {
+func (a *Aggregate) HandleRender(c *gin.Context) {
 	contentType := expfmt.Negotiate(c.Request.Header)
 	c.Header("Content-Type", string(contentType))
-	enc := expfmt.NewEncoder(c.Writer, contentType)
+	a.encodeAllMetrics(c.Writer, contentType)
+
+	// TODO reset gauges
+}
+
+func (a *Aggregate) encodeAllMetrics(writer io.Writer, contentType expfmt.Format) {
+	enc := expfmt.NewEncoder(writer, contentType)
 
 	a.familiesLock.RLock()
 	defer a.familiesLock.RUnlock()
@@ -176,10 +182,9 @@ func (a *aggregate) handleRender(c *gin.Context) {
 		MetricCountByType.WithLabelValues(typeName).Set(float64(count))
 	}
 
-	// TODO reset gauges
 }
 
-func (a *aggregate) encodeMetric(name string, enc expfmt.Encoder) bool {
+func (a *Aggregate) encodeMetric(name string, enc expfmt.Encoder) bool {
 	a.families[name].lock.RLock()
 	defer a.families[name].lock.RUnlock()
 
@@ -192,7 +197,7 @@ func (a *aggregate) encodeMetric(name string, enc expfmt.Encoder) bool {
 
 var ErrOddNumberOfLabelParts = errors.New("labels must be defined in pairs")
 
-func (a *aggregate) handleInsert(c *gin.Context) {
+func (a *Aggregate) HandleInsert(c *gin.Context) {
 	labelParts, jobName, err := parseLabelsInPath(c)
 	if err != nil {
 		log.Println(err)
@@ -210,11 +215,11 @@ func (a *aggregate) handleInsert(c *gin.Context) {
 	c.Status(http.StatusAccepted)
 }
 
-type labelPair struct {
+type LabelPair struct {
 	name, value string
 }
 
-func parseLabelsInPath(c *gin.Context) ([]labelPair, string, error) {
+func parseLabelsInPath(c *gin.Context) ([]LabelPair, string, error) {
 	labelString := c.Param("labels")
 	labelString = strings.Trim(labelString, "/")
 	if labelString == "" {
@@ -227,13 +232,13 @@ func parseLabelsInPath(c *gin.Context) ([]labelPair, string, error) {
 	}
 
 	var (
-		labelPairs []labelPair
+		labelPairs []LabelPair
 		jobName    string
 	)
 	for idx := 0; idx < len(labelParts); idx += 2 {
 		name := labelParts[idx]
 		value := labelParts[idx+1]
-		labelPairs = append(labelPairs, labelPair{name, value})
+		labelPairs = append(labelPairs, LabelPair{name, value})
 		if name == "job" {
 			jobName = value
 		}

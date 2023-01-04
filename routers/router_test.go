@@ -1,4 +1,4 @@
-package main
+package routers
 
 import (
 	"bytes"
@@ -11,14 +11,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
-	metrics "github.com/slok/go-http-metrics/metrics/prometheus"
+	promMetrics "github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zapier/prom-aggregation-gateway/metrics"
 )
 
-func setupTestRouter(cfg apiRouterConfig) *gin.Engine {
-	agg := newAggregate()
-	promConfig := metrics.Config{
+func setupTestRouter(cfg ApiRouterConfig) *gin.Engine {
+	agg := metrics.NewAggregate()
+	promConfig := promMetrics.Config{
 		Registry: prometheus.NewRegistry(),
 	}
 	return setupAPIRouter(cfg, agg, promConfig)
@@ -92,7 +93,7 @@ some_counter{job="someJob"} 1
 	for idx, test := range tests {
 		t.Run(fmt.Sprintf("test #%d: %s", idx+1, test.name), func(t *testing.T) {
 			// setup router
-			router := setupTestRouter(apiRouterConfig{corsDomain: "https://cors-domain"})
+			router := setupTestRouter(ApiRouterConfig{CorsDomain: "https://cors-domain"})
 
 			// ---- insert metric ----
 			// setup request
@@ -124,7 +125,7 @@ func TestAuthRouter(t *testing.T) {
 	tests := []struct {
 		name                   string
 		path, metric           string
-		accounts               gin.Accounts
+		accounts               []string
 		authName, authPassword string
 		statusCode             int
 		expected               string
@@ -133,7 +134,7 @@ func TestAuthRouter(t *testing.T) {
 			"Passing 202 basic auth",
 			"/metrics",
 			"# TYPE some_counter counter\nsome_counter 1\n",
-			gin.Accounts{"user": "password"},
+			[]string{"user=password"},
 			"user", "password",
 			202,
 			"# TYPE some_counter counter\nsome_counter 1\n",
@@ -142,7 +143,7 @@ func TestAuthRouter(t *testing.T) {
 			"Failing 401 basic auth",
 			"/metrics",
 			"# TYPE some_counter counter\nsome_counter 1\n",
-			gin.Accounts{"user": "password"},
+			[]string{"user=password"},
 			"user1", "password1",
 			401,
 			"",
@@ -152,7 +153,7 @@ func TestAuthRouter(t *testing.T) {
 	for idx, test := range tests {
 		t.Run(fmt.Sprintf("test #%d: %s", idx+1, test.name), func(t *testing.T) {
 			// setup router
-			router := setupTestRouter(apiRouterConfig{corsDomain: "https://cors-domain", accounts: test.accounts})
+			router := setupTestRouter(ApiRouterConfig{CorsDomain: "https://cors-domain", Accounts: test.accounts})
 
 			buf := bytes.NewBufferString(test.metric)
 			req, err := http.NewRequest("PUT", test.path, buf)

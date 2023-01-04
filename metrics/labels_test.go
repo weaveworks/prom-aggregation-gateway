@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"fmt"
@@ -8,8 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var TestLabels = []LabelPair{
+	{"job", "test"},
+}
+
 func TestFormatLabels(t *testing.T) {
-	a := newAggregate()
+	a := NewAggregate()
 	a.options.ignoredLabels = []string{"ignore_me"}
 
 	m := &dto.Metric{
@@ -20,7 +24,7 @@ func TestFormatLabels(t *testing.T) {
 			{},
 		},
 	}
-	a.formatLabels(m, []labelPair{{"job", "test"}, {"thing3", "value3"}})
+	a.formatLabels(m, []LabelPair{{"job", "test"}, {"thing3", "value3"}})
 
 	assert.Equal(t, &dto.LabelPair{Name: strPtr("job"), Value: strPtr("test")}, m.Label[0])
 	assert.Equal(t, &dto.LabelPair{Name: strPtr("thing1"), Value: strPtr("value1")}, m.Label[1])
@@ -82,10 +86,10 @@ var testLabelTable = []struct {
 
 func BenchmarkFormatLabels(b *testing.B) {
 	for _, v := range testLabelTable {
-		a := newAggregate(AddIgnoredLabels(v.ignoredLabels...))
+		a := NewAggregate(AddIgnoredLabels(v.ignoredLabels...))
 		b.Run(fmt.Sprintf("metric_type_%s", v.inputName), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				a.formatLabels(v.m, testLabels)
+				a.formatLabels(v.m, TestLabels)
 			}
 		})
 	}

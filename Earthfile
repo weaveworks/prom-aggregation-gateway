@@ -1,8 +1,11 @@
 VERSION 0.6
 
-ARG version="dev"
 ARG image_name="prom-aggregation-gateway"
 ARG token=""
+
+ARG commitSHA=""
+ARG version="dev"
+ARG PKG_PATH="github.com/zapier/prom-aggregation-gateway"
 
 ARG ALPINE_VERSION="3.17"
 ARG CHART_RELEASER_VERSION="1.4.1"
@@ -43,7 +46,7 @@ build-binary:
 
     WORKDIR /src
     COPY . /src
-    RUN go build -o prom-aggregation-gateway .
+    RUN go build -ldflags "-X ${PKG_PATH}/config.Version=${version} -X ${PKG_PATH}/config.CommitSHA=${commitSHA}" -o prom-aggregation-gateway .
 
     SAVE ARTIFACT ./prom-aggregation-gateway
 
@@ -75,7 +78,8 @@ build-binaries:
         CGO_ENABLED=0 \
         gox \
             -parallel=3 \
-            -ldflags "-X main.version=${version}" \
+            -ldflags "-X ${PKG_PATH}/config.Version=${version}" \
+            -ldflags "-X ${PKG_PATH}/config.CommitSHA=${commitSHA}" \
             -output="_dist/prom-aggregation-gateway-${version}-{{.OS}}-{{.Arch}}" \
             -osarch='darwin/amd64 darwin/arm64 linux/amd64 linux/386 linux/arm linux/arm64 linux/ppc64le linux/s390x windows/amd64' \
             .

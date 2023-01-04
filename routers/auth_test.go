@@ -1,4 +1,4 @@
-package main
+package routers
 
 import (
 	"fmt"
@@ -10,17 +10,17 @@ import (
 
 func TestProcessAuthConfig(t *testing.T) {
 	tests := []struct {
-		name       string
-		authString string
-		accounts   gin.Accounts
+		name     string
+		authList []string
+		accounts gin.Accounts
 	}{
-		{"basic 1", "user=password", gin.Accounts{"user": "password"}},
-		{"two", "user=password,user1=password1", gin.Accounts{"user": "password", "user1": "password1"}},
+		{"basic 1", []string{"user=password"}, gin.Accounts{"user": "password"}},
+		{"two", []string{"user=password", "user1=password1"}, gin.Accounts{"user": "password", "user1": "password1"}},
 	}
 
 	for idx, test := range tests {
 		t.Run(fmt.Sprintf("test #%d: %s", idx+1, test.name), func(t *testing.T) {
-			a := processAuthConfig(test.authString)
+			a := processAuthConfig(test.authList)
 			assert.Equal(t, test.accounts, a)
 		})
 	}
