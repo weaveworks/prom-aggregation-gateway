@@ -1,6 +1,6 @@
 # Prometheus Aggregation Gateway
 
-Prometheus Aggregation Gateway is a aggregating push gateway for Prometheus.  As opposed to the official [Prometheus Pushgateway](https://github.com/prometheus/pushgateway), this service aggregates the sample values it receives.
+Prometheus Aggregation Gateway is a push gateway that aggregates metrics for Prometheus.  As opposed to the official [Prometheus Pushgateway](https://github.com/prometheus/pushgateway), this service aggregates the sample values it receives.
 
 * Counters where all labels match are added up.
 * Histograms are added up; if bucket boundaries are mismatched then the result has the union of all buckets and counts are given to the lowest bucket that fits.
@@ -39,6 +39,39 @@ push_to_gateway('localhost', job='my_job_name', registry=registry)
 ```
 
 Then have your Prometheus scrape metrics at `/metrics`.
+
+### Running the service
+
+
+help command can be useful when calling the binary to see what commands and flags are available
+
+```bash
+$ prom-aggregation-gateway --help
+
+prometheus aggregation gateway
+
+Usage:
+  prom-aggregation-gateway [flags]
+  prom-aggregation-gateway [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  start       starts up the server
+  version     Show version information
+
+Flags:
+      --AuthUsers strings        List of allowed auth users and their passwords comma separated
+                                  Example: "user1=pass1,user2=pass2"
+      --apiListen string         Listen for API requests on this host/port. (default ":80")
+      --cors string              The 'Access-Control-Allow-Origin' value to be returned. (default "*")
+  -h, --help                     help for prom-aggregation-gateway
+      --lifecycleListen string   Listen for lifecycle requests (health, metrics) on this host/port (default ":8888")
+
+Use "prom-aggregation-gateway [command] --help" for more information about a command.
+```
+
+Any flags you see above can also be set by `ENV_VARIABLES`. ENV_VARS must have a prefix of `PAG_`, for example `PAG_AUTHUSERS=user1=pass1,user2=pass2` will start the service with basic auth. If an ENV_VARIABLE is set than it will be used over a CLI argument passed to the service.
 
 ## Ready-built images
 
@@ -125,9 +158,9 @@ According to https://prometheus.io/docs/practices/pushing/:
 >
 > The latter point is especially relevant when multiple instances of a job differentiate their metrics in the Pushgateway via an instance label or similar.
 
-This restriction makes the Prometheus pushgateway inappropriate for the usecase of accepting metrics from a client-side web app, so we created this one to aggregate counters from multiple senders.
+This restriction makes the Prometheus pushgateway inappropriate for the use case of accepting metrics from a client-side web app, so we created this one to aggregate counters from multiple senders.
 
-Prom-aggregation-gateway presents a similar API, but does not attempt to be a drop-in replacement.
+Prom-aggregation-gateway presents a similar API but does not attempt to be a drop-in replacement.
 
 ## Client Libraries
 ### Python
