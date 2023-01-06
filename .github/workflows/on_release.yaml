@@ -37,7 +37,8 @@ jobs:
             --push \
             +release-binaries \
             --version=${{ env.RELEASE_VERSION }} \
-            --commitSHA=${{ env.SHORT_SHA }}
+            --commitSHA=${{ env.SHORT_SHA }} \
+            --token ${{ secrets.GITHUB_TOKEN }}
 
   release-image:
     runs-on: ubuntu-22.04
