@@ -1,17 +1,17 @@
 ```mermaid
 graph TD
-        build --> build-docker
-        build --> build-helm
-        build-docker --> build-binary
-        continuous-deploy --> build-helm
-        lint-golang --> go-deps
-        test-golang --> go-deps
-        test --> ci-golang
-        release --> build-docker
-        release --> release-binaries
-        build-binary --> go-deps
-        ci-golang --> lint-golang
-        ci-golang --> test-golang
-        ci-helm --> test-helm
-        release-binaries --> build-binaries
+	build --> build-helm
+	build --> build-image
+	build-binary --> go-deps
+	build-image --> build-binary
+	ci-golang --> lint-golang
+	ci-golang --> test-golang
+	ci-helm --> test-helm
+	continuous-deploy --> build-helm
+	lint-golang --> go-deps
+	release --> build-image
+	release --> release-binaries
+	release-binaries --> build-binaries
+	test --> ci-golang
+	test-golang --> go-deps
 ```
