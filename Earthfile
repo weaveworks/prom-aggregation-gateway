@@ -27,12 +27,12 @@ ci-helm:
     BUILD +test-helm
 
 build:
-    BUILD +build-docker
+    BUILD +build-image
     BUILD +build-helm
 
 release:
     BUILD +release-binaries
-    BUILD +build-docker
+    BUILD +build-image
 
 go-deps:
     FROM golang:${GOLANG_VERSION}-alpine${ALPINE_VERSION}
@@ -50,7 +50,7 @@ build-binary:
 
     SAVE ARTIFACT ./prom-aggregation-gateway
 
-build-docker:
+build-image:
     FROM alpine:${ALPINE_VERSION}
     COPY +build-binary/prom-aggregation-gateway .
     ENV GIN_MODE=release
