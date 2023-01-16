@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/weaveworks/prom-aggregation-gateway
     docker:
-      - image: weaveworks/build-golang:1.12.1-stretch
+      - image: weaveworks/build-golang:1.14.4-stretch
     steps:
       - checkout
       - setup_remote_docker
