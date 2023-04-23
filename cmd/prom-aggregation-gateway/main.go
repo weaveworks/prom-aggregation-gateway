@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"sync"
 
@@ -264,6 +265,10 @@ func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `{"alive": true}`)
 }
 
+func handleQuit(w http.ResponseWriter, r *http.Request) {
+	os.Exit(0)
+}
+
 func main() {
 	listen := flag.String("listen", ":80", "Address and port to listen on.")
 	cors := flag.String("cors", "*", "The 'Access-Control-Allow-Origin' value to be returned.")
@@ -274,6 +279,7 @@ func main() {
 	http.HandleFunc("/metrics", a.handler)
 	http.HandleFunc("/-/healthy", handleHealthCheck)
 	http.HandleFunc("/-/ready", handleHealthCheck)
+	http.HandleFunc("/-/quit", handleQuit)
 	http.HandleFunc(*pushPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", *cors)
 		if err := a.parseAndMerge(r.Body); err != nil {
