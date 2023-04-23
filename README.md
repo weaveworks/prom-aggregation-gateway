@@ -20,6 +20,14 @@ Prometheus Aggregation Gateway is a aggregating push gateway for Prometheus.  As
 
 ## How to use
 
+Create a yaml configuration file and add the port, e.g:
+
+```
+port: 8084
+```
+
+To run with the configuration file add the argument [-config]
+
 Send metrics in [Prometheus format](https://prometheus.io/docs/instrumenting/exposition_formats/) to `/metrics/`
 
 E.g. if you have the program running locally:
