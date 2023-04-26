@@ -117,12 +117,10 @@ func mergeMetric(ty dto.MetricType, a, b *dto.Metric) *dto.Metric {
 			},
 		}
 
-	case dto.MetricType_SUMMARY:
-		// No way of merging summaries, abort.
+	default:
+		// No way of merging other metrics types, discard.
 		return nil
 	}
-
-	return nil
 }
 
 func mergeFamily(a, b *dto.MetricFamily) (*dto.MetricFamily, error) {
@@ -206,13 +204,17 @@ func (a *aggate) parseAndMerge(r io.Reader) error {
 	a.familiesLock.Lock()
 	defer a.familiesLock.Unlock()
 	for name, family := range inFamilies {
+		// Discard unsupported types
+		if *family.Type == dto.MetricType_SUMMARY {
+			continue
+		}
+		if err := validateFamily(family); err != nil {
+			return err
+		}
+
 		// Sort labels in case source sends them inconsistently
 		for _, m := range family.Metric {
 			sort.Sort(byName(m.Label))
-		}
-
-		if err := validateFamily(family); err != nil {
-			return err
 		}
 
 		// family must be sorted for the merge
